@@ -124,6 +124,20 @@ class YouTubePublisher(Publisher):
             print(f"[youtube] Analytics 取得失敗（基本指標のみで継続）: {e}")
         return metrics
 
+    def fetch_account_followers(self) -> int | None:
+        from google.auth.exceptions import GoogleAuthError
+        from googleapiclient.errors import HttpError
+
+        try:
+            resp = self._youtube().channels().list(part="statistics", mine=True).execute()
+            items = resp.get("items", [])
+            if items:
+                count = items[0].get("statistics", {}).get("subscriberCount")
+                return int(count) if count is not None else None
+        except (HttpError, GoogleAuthError) as e:
+            print(f"[youtube] channels.list(mine=True) 失敗: {e}")
+        return None
+
     def _fetch_analytics(self, platform_post_id: str) -> dict:
         from datetime import datetime, timedelta, timezone
 

@@ -177,6 +177,34 @@ def test_fetch_metrics_parses_insights(monkeypatch):
     assert metrics == {"likes": 12, "reach": 300}
 
 
+def test_fetch_metrics_converts_avg_watch_time_from_ms_to_sec(monkeypatch):
+    def fake_get(url, params, timeout):
+        return _FakeResponse({"data": [
+            {"name": "ig_reels_avg_watch_time", "values": [{"value": 31775}]},
+        ]})
+
+    pub = _pub(monkeypatch, get=fake_get)
+    metrics = pub.fetch_metrics("media-1")
+    assert metrics == {"avg_watch_sec": 31.775}
+
+
+def test_fetch_account_followers_returns_count(monkeypatch):
+    def fake_get(url, params, timeout):
+        assert params["fields"] == "followers_count"
+        return _FakeResponse({"followers_count": 42})
+
+    pub = _pub(monkeypatch, get=fake_get)
+    assert pub.fetch_account_followers() == 42
+
+
+def test_fetch_account_followers_returns_none_on_error(monkeypatch):
+    def fake_get(url, params, timeout):
+        raise requests.ConnectionError("boom")
+
+    pub = _pub(monkeypatch, get=fake_get)
+    assert pub.fetch_account_followers() is None
+
+
 def test_fetch_metrics_returns_empty_on_error(monkeypatch):
     def fake_get(url, params, timeout):
         raise requests.ConnectionError("boom")

@@ -87,18 +87,35 @@ class InstagramPublisher(Publisher):
         metrics: dict = {}
         try:
             # ★2026-09-05 実API確認: "plays" は廃止済みで "views" が正。
+            # "impressions" は REELS では未対応（Media Insights API がエラーを返す）。
             resp = self._get(
                 f"{platform_post_id}/insights",
-                params={"metric": "likes,comments,shares,saved,reach,views"},
+                params={"metric": "likes,comments,shares,saved,reach,views,"
+                                   "ig_reels_avg_watch_time"},
             )
             for row in resp.get("data", []):
                 name = row.get("name")
                 values = row.get("values") or []
-                if name and values:
-                    metrics[name] = values[0].get("value")
+                if not (name and values):
+                    continue
+                value = values[0].get("value")
+                if name == "ig_reels_avg_watch_time" and value is not None:
+                    # ★2026-09-05 実API確認: ミリ秒単位で返る（例: 8秒の動画で31775=31.8秒
+                    # 相当のような値）。秒に揃えてから avg_watch_sec として格納する。
+                    metrics["avg_watch_sec"] = value / 1000
+                else:
+                    metrics[name] = value
         except (requests.RequestException, _GraphAPIError) as e:
             print(f"[instagram] insights取得失敗: {e}")
         return metrics
+
+    def fetch_account_followers(self) -> int | None:
+        try:
+            resp = self._get(self._ig_user_id(), params={"fields": "followers_count"})
+        except (requests.RequestException, _GraphAPIError) as e:
+            print(f"[instagram] followers_count取得失敗: {e}")
+            return None
+        return resp.get("followers_count")
 
     # --- 内部: Instagram Graph API ------------------------------------------
 

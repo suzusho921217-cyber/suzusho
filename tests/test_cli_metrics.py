@@ -1,10 +1,15 @@
 """cli metrics の配線テスト＋ 生成→投稿→回収→学習→企画 のフルループ。"""
 
 import json
+from datetime import datetime, timezone
 
 import pytest
 
+import src.cli as cli_module
 from src.cli import main
+from src.common.models import AccountDaily, Brand, Platform, PolicyDecision, Post, PostStatus
+from src.publishers.base import Publisher, PublishResult
+from src.sheets.client import LocalStore
 
 
 @pytest.fixture
@@ -37,6 +42,54 @@ def test_metrics_is_incremental(published):
     snaps = json.loads((published / "db" / "snapshots.json").read_text(encoding="utf-8"))
     # latest は毎回追記されるので 2 回 × 6 投稿 = 12
     assert len(snaps) == 12
+
+
+class _FakeAccountPublisher(Publisher):
+    platform = Platform.YOUTUBE
+
+    def publish(self, req):
+        return PublishResult(ok=True, platform_post_id="x")
+
+    def find_existing(self, post):
+        return None
+
+    def fetch_metrics(self, platform_post_id):
+        return {"views": 500}
+
+    def fetch_account_followers(self):
+        return 120
+
+
+def test_metrics_tracks_followers_before_and_after(tmp_path, monkeypatch):
+    monkeypatch.setattr(cli_module, "STATE_DIR", tmp_path)
+    monkeypatch.setattr(cli_module, "get_publisher", lambda platform, brand=None: _FakeAccountPublisher())
+
+    store = LocalStore(tmp_path / "db")
+    store.upsert_account_daily(AccountDaily(
+        date="2026-09-03", brand=Brand.DOG, platform=Platform.YOUTUBE,
+        account_id="dog-youtube", followers=100,
+    ))
+    store.upsert_post(Post(
+        post_key="p1:youtube", master_video_id="p1", brand=Brand.DOG,
+        platform=Platform.YOUTUBE, account_id="dog-youtube", concept_tag="c",
+        hook_type="h", character_id="DOG_001", duration_sec=8, oddity_level=1,
+        prompt_version="v1", generation_cost_jpy=32.0, policy_version="v1",
+        policy_result=PolicyDecision.PASS, status=PostStatus.PUBLISHED,
+        published_at=datetime(2026, 9, 5, 0, 0, tzinfo=timezone.utc),
+        platform_post_id="yt-1",
+    ))
+
+    rc = main(["metrics"])
+    assert rc == 0
+
+    snaps = store.list_snapshots(post_key="p1:youtube")
+    assert len(snaps) == 1
+    assert snaps[0].followers_before == 100
+    assert snaps[0].followers_after == 120
+
+    today_rows = [a for a in store.list_account_daily() if a.account_id == "dog-youtube"]
+    todays = max(today_rows, key=lambda a: a.date)
+    assert todays.followers == 120
 
 
 def test_full_loop_metrics_to_performance_mode_plan(published):

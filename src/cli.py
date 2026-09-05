@@ -47,6 +47,7 @@ from src.common.guardrails import (
     combine,
 )
 from src.common.models import (
+    AccountDaily,
     Brand,
     ContentPlan,
     ExperimentFlag,
@@ -701,10 +702,31 @@ def cmd_metrics(args: argparse.Namespace) -> int:
     """
     store = get_store(root=STATE_DIR / "db")
     now = datetime.now(JST)
+    today = now.date().isoformat()
     posts = [
         p for p in store.list_posts()
         if p.status is PostStatus.PUBLISHED and p.platform_post_id
     ]
+
+    # アカウント単位（brand×platform×account_id）のフォロワー数は投稿ごとに毎回
+    # 問い合わせず、このコマンド1回の実行で使い回す。同じ値をアカウント日次DBにも
+    # 記録し（既存の当日分の他フィールドは残す）、投稿前フォロワー数の照会に使う。
+    followers_cache: dict[tuple[str, str], int | None] = {}
+    account_daily_index: dict[str, AccountDaily] = {
+        f"{a.date}|{a.account_id}": a for a in store.list_account_daily()
+    }
+
+    def _followers_before(post: Post) -> int | None:
+        if post.published_at is None:
+            return None
+        pub_date = post.published_at.date().isoformat()
+        candidates = [
+            a for a in account_daily_index.values()
+            if a.account_id == post.account_id and a.date < pub_date
+        ]
+        if not candidates:
+            return None
+        return max(candidates, key=lambda a: a.date).followers
 
     collected = 0
     for post in posts:
@@ -712,10 +734,46 @@ def cmd_metrics(args: argparse.Namespace) -> int:
         due = due_snapshots(post, now, existing_labels=existing)
         if not due:
             continue
-        raw = get_publisher(post.platform, brand=post.brand).fetch_metrics(post.platform_post_id)
+        publisher = get_publisher(post.platform, brand=post.brand)
+        raw = publisher.fetch_metrics(post.platform_post_id)
+
+        cache_key = (post.platform.value, post.brand.value)
+        if cache_key not in followers_cache:
+            try:
+                followers_cache[cache_key] = publisher.fetch_account_followers()
+            except Exception as e:  # noqa: BLE001 - 媒体API由来の未知の例外を握りつぶし継続
+                print(f"[metrics] {post.platform.value} フォロワー数取得失敗: {e}")
+                followers_cache[cache_key] = None
+        current_followers = followers_cache[cache_key]
+
+        followers_before = _followers_before(post)
         for label in due:
-            store.append_snapshot(collect_snapshot(post, label, raw, now=now))
+            snap = collect_snapshot(post, label, raw, followers_before=followers_before, now=now)
+            if current_followers is not None:
+                if snap.followers_before is None:
+                    snap.followers_before = followers_before
+                snap.followers_after = current_followers
+            store.append_snapshot(snap)
             collected += 1
+
+    # 今回取得できたフォロワー数を当日分としてアカウント日次DBに反映（既存フィールドは維持）
+    for (platform_value, brand_value), followers in followers_cache.items():
+        if followers is None:
+            continue
+        posts_for_account = [
+            p for p in posts
+            if p.platform.value == platform_value and p.brand.value == brand_value
+        ]
+        if not posts_for_account:
+            continue
+        account_id = posts_for_account[0].account_id
+        key = f"{today}|{account_id}"
+        row = account_daily_index.get(key) or AccountDaily(
+            date=today, brand=Brand(brand_value), platform=Platform(platform_value),
+            account_id=account_id,
+        )
+        row.followers = followers
+        store.upsert_account_daily(row)
 
     n_records = _write_performance_json(store)
     print(f"[metrics] 公開済み {len(posts)} 件 / snapshot 追加 {collected} 件")

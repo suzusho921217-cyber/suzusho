@@ -62,16 +62,28 @@ class _FakeSearchResource:
         return _FakeExecutable(self._result, self._error)
 
 
+class _FakeChannelsResource:
+    def __init__(self, result=None, error=None):
+        self._result, self._error = result, error
+
+    def list(self, *, part, mine):
+        return _FakeExecutable(self._result, self._error)
+
+
 class _FakeYouTube:
-    def __init__(self, videos=None, search=None):
+    def __init__(self, videos=None, search=None, channels=None):
         self._videos = videos or _FakeVideosResource()
         self._search = search or _FakeSearchResource()
+        self._channels = channels or _FakeChannelsResource()
 
     def videos(self):
         return self._videos
 
     def search(self):
         return self._search
+
+    def channels(self):
+        return self._channels
 
 
 class _FakeReportsResource:
@@ -239,3 +251,20 @@ def test_fetch_metrics_degrades_to_basic_stats_when_analytics_fails(monkeypatch)
 
     metrics = pub.fetch_metrics("yt-123")
     assert metrics == {"views": 10}
+
+
+# --- fetch_account_followers ------------------------------------------------
+
+def test_fetch_account_followers_returns_subscriber_count(monkeypatch):
+    channels = _FakeChannelsResource(result={"items": [{"statistics": {"subscriberCount": "42"}}]})
+    pub = YouTubePublisher()
+    _wire(monkeypatch, pub, youtube=_FakeYouTube(channels=channels))
+    assert pub.fetch_account_followers() == 42
+
+
+def test_fetch_account_followers_returns_none_on_error(monkeypatch):
+    err = HttpError(resp=type("R", (), {"status": 403, "reason": "Forbidden"})(), content=b"boom")
+    channels = _FakeChannelsResource(error=err)
+    pub = YouTubePublisher()
+    _wire(monkeypatch, pub, youtube=_FakeYouTube(channels=channels))
+    assert pub.fetch_account_followers() is None

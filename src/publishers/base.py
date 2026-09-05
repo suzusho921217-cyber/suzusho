@@ -56,3 +56,11 @@ class Publisher(abc.ABC):
     @abc.abstractmethod
     def fetch_metrics(self, platform_post_id: str) -> dict:
         """指標を取得する。取得できない項目は含めない（呼び出し側で再正規化）。"""
+
+    def fetch_account_followers(self) -> int | None:
+        """このアカウント（ブランド×媒体）の現在のフォロワー/登録者数。
+
+        投稿前後のフォロワー比較（§10.2 followers_before/after）に使う。
+        既定は未対応（None）。対応する媒体だけオーバーライドする。
+        """
+        return None
