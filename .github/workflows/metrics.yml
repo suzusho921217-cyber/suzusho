@@ -2,7 +2,7 @@
 name: metrics
 on:
   schedule:
-    - cron: "0 */6 * * *"
+    - cron: "0 19 * * *"  # 04:00 JST（daily_learning 05:00 JST の前）。まずは1日1回で様子見
   workflow_dispatch:
 jobs:
   call:
