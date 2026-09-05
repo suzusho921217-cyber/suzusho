@@ -110,17 +110,23 @@ def _fill_views_delta(snap: PerformanceSnapshot, old_views) -> None:
         snap.views_delta = snap.views - int(old_views)
 
 
-# 「概念自体が無い」ことを空欄と区別して人向けに示す印。
-# key: この値がNoneの時に "-" を書くフィールド -> post_key の末尾(:platform)で判定する媒体
-_SNAPSHOT_NA_MARKERS: dict[str, str] = {
-    "engaged_views": "instagram",  # Instagramにはエンゲージ視聴数に相当する指標が無い
+# 「概念自体が無い/API仕様上取得不可」なことを空欄（＝今回たまたま取れなかった）と
+# 区別して人向けに示す印。値が None の対象媒体（None = 全媒体）なら "-" を書く。
+# ★2026-09-05 実API確認: impressions は YouTube Analytics APIに存在しない識別子
+# （Unknown identifier エラー）／Instagram REELSでは非対応。revenue_jpy はYouTubeが
+# 未収益化（収益化すれば自動で実数値に置き換わる。このロジックはNoneの間だけ働く）、
+# Instagramはオーガニック投稿の収益指標自体がAPIに存在しない。
+_SNAPSHOT_NA_MARKERS: dict[str, set[str] | None] = {
+    "engaged_views": {"instagram"},  # Instagramにはエンゲージ視聴数に相当する指標が無い
+    "impressions": None,             # 両媒体ともAPIで取得不可
+    "revenue_jpy": None,             # 両媒体とも取得不可(YouTubeは収益化すれば直る)
 }
 
 
 def _snapshot_row_with_na_markers(row: dict) -> dict:
     platform = row.get("post_key", "").rsplit(":", 1)[-1]
-    for field, target_platform in _SNAPSHOT_NA_MARKERS.items():
-        if platform == target_platform and row.get(field) is None:
+    for field, target_platforms in _SNAPSHOT_NA_MARKERS.items():
+        if (target_platforms is None or platform in target_platforms) and row.get(field) is None:
             row[field] = "-"
     return row
 
@@ -290,6 +296,8 @@ _SNAPSHOT_UNITS = {
     "impressions": "回", "avg_watch_sec": "秒", "followers_after": "人",
     "followers_delta": "人", "revenue_jpy": "円", "views_delta": "回",
 }
+# 単位付き数値のうち、小数の桁数を絞りたいフィールド（見やすさのため）
+_ROUND_DIGITS: dict[str, int] = {"avg_watch_sec": 1}
 
 _ACCOUNT_HEADERS_JA = {
     "date": "日付", "brand": "ブランド", "platform": "媒体", "account_id": "アカウントID",
@@ -490,6 +498,8 @@ class SheetsStore(Store):
                 v = value_maps[key].get(v, v)
             elif v is not None and key in units and isinstance(v, (int, float)):
                 num = int(v) if isinstance(v, float) and v.is_integer() else v
+                if isinstance(num, float) and key in _ROUND_DIGITS:
+                    num = round(num, _ROUND_DIGITS[key])
                 v = f"{num:,}{units[key]}"
             values.append("" if v is None else v)
         return values

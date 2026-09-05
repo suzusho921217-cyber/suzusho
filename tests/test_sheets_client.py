@@ -347,6 +347,17 @@ def test_sheets_upsert_snapshot_replaces_same_post_and_label():
     assert snaps[0].views_delta == 10  # 20 - 10
 
 
+def test_sheets_avg_watch_sec_rounded_to_one_decimal():
+    tabs = {"パフォーマンスDB": [_SNAPSHOT_HEADER_JA]}
+    store = _fake_store(tabs)
+    store.upsert_snapshot(PerformanceSnapshot(
+        post_key="p1:instagram", snapshot="latest",
+        collected_at=datetime(2026, 9, 2, tzinfo=JST), views=10, avg_watch_sec=14.841,
+    ))
+    written = dict(zip(_SNAPSHOT_HEADER_JA, tabs["パフォーマンスDB"][1]))
+    assert written["平均視聴秒数"] == "14.8秒"
+
+
 def test_sheets_instagram_engaged_views_shown_as_na_marker():
     tabs = {"パフォーマンスDB": [_SNAPSHOT_HEADER_JA]}
     store = _fake_store(tabs)
@@ -370,6 +381,35 @@ def test_sheets_youtube_engaged_views_stays_blank_when_missing():
     written = dict(zip(_SNAPSHOT_HEADER_JA, tabs["パフォーマンスDB"][1]))
     # YouTubeでは「今回たまたま取れなかった」可能性があるので "-" にはしない(空欄のまま)
     assert written["eng視聴数"] == ""
+
+
+def test_sheets_impressions_and_revenue_shown_as_na_for_both_platforms():
+    tabs = {"パフォーマンスDB": [_SNAPSHOT_HEADER_JA]}
+    store = _fake_store(tabs)
+    for platform in ("instagram", "youtube"):
+        store.upsert_snapshot(PerformanceSnapshot(
+            post_key=f"p1:{platform}", snapshot="latest",
+            collected_at=datetime(2026, 9, 2, tzinfo=JST),
+            views=10, impressions=None, revenue_jpy=None,
+        ))
+    for platform in ("instagram", "youtube"):
+        written = dict(zip(_SNAPSHOT_HEADER_JA, next(
+            row for row in tabs["パフォーマンスDB"][1:]
+            if row[0] == f"p1:{platform}"
+        )))
+        assert written["IMP数"] == "-"
+        assert written["収益"] == "-"
+
+
+def test_sheets_revenue_switches_to_real_value_once_available():
+    tabs = {"パフォーマンスDB": [_SNAPSHOT_HEADER_JA]}
+    store = _fake_store(tabs)
+    store.upsert_snapshot(PerformanceSnapshot(
+        post_key="p1:youtube", snapshot="latest",
+        collected_at=datetime(2026, 9, 2, tzinfo=JST), views=10, revenue_jpy=500.0,
+    ))
+    written = dict(zip(_SNAPSHOT_HEADER_JA, tabs["パフォーマンスDB"][1]))
+    assert written["収益"] == "500円"  # None でない限り "-" にはならない
 
 
 def test_sheets_account_daily_upsert_by_composite_key():
