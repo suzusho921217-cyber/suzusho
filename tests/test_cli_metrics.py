@@ -1,7 +1,9 @@
 """cli metrics の配線テスト＋ 生成→投稿→回収→学習→企画 のフルループ。"""
 
 import json
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
+
+_JST = timezone(timedelta(hours=9))
 
 import pytest
 
@@ -97,7 +99,9 @@ def test_metrics_aggregates_daily_account_stats(tmp_path, monkeypatch):
     monkeypatch.setattr(cli_module, "STATE_DIR", tmp_path)
     monkeypatch.setattr(cli_module, "get_publisher", lambda platform, brand=None: _FakeAccountPublisher())
 
-    today = datetime.now(timezone.utc)
+    # cmd_metrics 側の「今日」判定はJST基準なので、テストの published_at もJSTで揃える
+    # （UTCのままだとJST日付境界(0-9時)の実行だけ日付がズレて落ちる）。
+    today = datetime.now(_JST)
     store = LocalStore(tmp_path / "db")
     for i in range(2):
         store.upsert_post(Post(
