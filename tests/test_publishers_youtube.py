@@ -1,5 +1,6 @@
 """publishers.youtube: 実アダプタ（モックした googleapiclient 経由）。"""
 
+from google.auth.exceptions import RefreshError
 from googleapiclient.errors import HttpError
 
 from src.common.models import Brand, Platform, PolicyDecision, Post, PostStatus
@@ -134,6 +135,8 @@ def test_publish_uploads_with_idempotency_tag_and_disclosure(monkeypatch, tmp_pa
     body = videos.insert_calls[0]["body"]
     assert _idempotency_tag(_post()) in body["snippet"]["tags"]
     assert body["status"]["containsSyntheticMedia"] is True
+    # API側フラグが反映されないことがあると実運用で判明したため、説明欄にも明記する
+    assert "AI" in body["snippet"]["description"]
 
 
 def test_publish_returns_failed_result_on_http_error(monkeypatch, tmp_path):
@@ -143,6 +146,24 @@ def test_publish_returns_failed_result_on_http_error(monkeypatch, tmp_path):
     videos = _FakeVideosResource(insert_error=err)
     pub = YouTubePublisher()
     _wire(monkeypatch, pub, youtube=_FakeYouTube(videos=videos))
+
+    result = pub.publish(_req(video_path=str(video)))
+    assert result.ok is False
+    assert result.error
+
+
+def test_publish_returns_failed_result_on_missing_credentials(monkeypatch, tmp_path):
+    # ブランド別のリフレッシュトークンが未設定だと google.auth.exceptions.RefreshError になる。
+    # これで丸ごとクラッシュせず、他ブランドの投稿には影響しないことを確認する。
+    video = tmp_path / "x.mp4"
+    video.write_bytes(b"fake video bytes")
+    pub = YouTubePublisher(brand=Brand.CAT)
+
+    class _RaisingVideos:
+        def insert(self, *, part, body, media_body):
+            raise RefreshError("no refresh token configured")
+
+    monkeypatch.setattr(pub, "_youtube", lambda: _FakeYouTube(videos=_RaisingVideos()))
 
     result = pub.publish(_req(video_path=str(video)))
     assert result.ok is False

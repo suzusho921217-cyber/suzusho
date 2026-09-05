@@ -27,12 +27,16 @@ _TOKEN_URI = "https://oauth2.googleapis.com/token"
 _SCOPES = [
     "https://www.googleapis.com/auth/youtube.upload",
     "https://www.googleapis.com/auth/youtube.readonly",  # videos.list / search.list に必要
+    "https://www.googleapis.com/auth/youtube.force-ssl",  # videos.update（投稿後の修正）に必要
     "https://www.googleapis.com/auth/yt-analytics.readonly",
 ]
 
 
 def _idempotency_tag(post: Post) -> str:
     return f"pk:{post.post_key}"
+
+
+_AI_DISCLOSURE_NOTE = "※この動画にはAIで生成・加工された合成コンテンツが含まれます。"
 
 
 class YouTubePublisher(Publisher):
@@ -44,13 +48,21 @@ class YouTubePublisher(Publisher):
         self._analytics_client = None
 
     def publish(self, req: PublishRequest) -> PublishResult:
+        from google.auth.exceptions import GoogleAuthError
         from googleapiclient.errors import HttpError
         from googleapiclient.http import MediaFileUpload
+
+        description = req.caption
+        if req.ai_disclosure:
+            # containsSyntheticMedia だけに頼らず、コンプライアンス上ここでも明示する(二重対策)。
+            # ★2026-09-05 実API確認: youtube.force-ssl スコープが無いと containsSyntheticMedia は
+            # エラー無く受理されつつ反映されない(videos.update で force-ssl 込みなら反映確認済み)。
+            description += f"\n\n{_AI_DISCLOSURE_NOTE}"
 
         body = {
             "snippet": {
                 "title": req.title[:100],  # YouTube 上限100文字
-                "description": req.caption,
+                "description": description,
                 "tags": [*req.tags, _idempotency_tag(req.post)],
                 "categoryId": env("YOUTUBE_CATEGORY_ID", "15"),  # 既定: Pets & Animals
             },
@@ -65,11 +77,12 @@ class YouTubePublisher(Publisher):
             resp = self._youtube().videos().insert(
                 part="snippet,status", body=body, media_body=media,
             ).execute()
-        except (HttpError, OSError) as e:
+        except (HttpError, OSError, GoogleAuthError) as e:
             return PublishResult(ok=False, error=str(e))
         return PublishResult(ok=True, platform_post_id=resp["id"])
 
     def find_existing(self, post: Post) -> str | None:
+        from google.auth.exceptions import GoogleAuthError
         from googleapiclient.errors import HttpError
 
         try:
@@ -77,12 +90,13 @@ class YouTubePublisher(Publisher):
                 part="id", forMine=True, type="video",
                 q=_idempotency_tag(post), maxResults=1,
             ).execute()
-        except HttpError:
+        except (HttpError, GoogleAuthError):
             return None  # 照会に失敗しても投稿自体は続行させる（新規投稿を試みる）
         items = resp.get("items", [])
         return items[0]["id"]["videoId"] if items else None
 
     def fetch_metrics(self, platform_post_id: str) -> dict:
+        from google.auth.exceptions import GoogleAuthError
         from googleapiclient.errors import HttpError
 
         metrics: dict = {}
@@ -99,12 +113,12 @@ class YouTubePublisher(Publisher):
                     metrics["likes"] = int(stats["likeCount"])
                 if "commentCount" in stats:
                     metrics["comments"] = int(stats["commentCount"])
-        except HttpError as e:
+        except (HttpError, GoogleAuthError) as e:
             print(f"[youtube] videos.list 失敗: {e}")
 
         try:
             metrics.update(self._fetch_analytics(platform_post_id))
-        except HttpError as e:
+        except (HttpError, GoogleAuthError) as e:
             # 未監査/未収益化チャンネルでは engagedViews 等が取れないことがある。
             # 基本指標（上）だけで処理を続ける。
             print(f"[youtube] Analytics 取得失敗（基本指標のみで継続）: {e}")
