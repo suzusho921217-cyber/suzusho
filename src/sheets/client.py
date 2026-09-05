@@ -294,6 +294,11 @@ def _format_dt_ja(iso_str: str) -> str:
         dt = datetime.fromisoformat(iso_str)
     except (TypeError, ValueError):
         return iso_str
+    # ★タイムゾーンをUTCに正規化してから表示用の数字にする。ここを省くと、
+    # 例えばJSTのdatetimeを渡した場合に時刻の数字だけそのままUTC扱いで
+    # 読み戻されてしまい、実際の時刻から9時間ずれる（実際に発生したバグ）。
+    if dt.tzinfo is not None:
+        dt = dt.astimezone(timezone.utc)
     return dt.strftime(_DT_DISPLAY_FMT)
 
 

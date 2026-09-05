@@ -1,6 +1,6 @@
 """sheets.client: LocalStore の行⇔モデル往復と 3DB の読み書き（§10）。"""
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 import pytest
 
@@ -231,6 +231,19 @@ def test_sheets_datetime_displayed_as_short_ja_format():
     assert written["投稿日時"] == "26/08/31 12:00"
     # 読み込み側は元の datetime に戻る
     assert store.get_post("p1:youtube").published_at == datetime(2026, 8, 31, 12, 0, tzinfo=JST)
+
+
+def test_sheets_datetime_normalizes_non_utc_timezone_to_utc():
+    # 実際に発生したバグ: JST等UTC以外のtzで保存すると、時刻の数字がそのまま
+    # UTC扱いで読み戻され、実時刻から9時間ずれていた。
+    tabs = {"投稿DB": [_POST_HEADER_JA]}
+    store = _fake_store(tabs)
+    actual_jst = timezone(timedelta(hours=9))
+    store.upsert_post(_post(published_at=datetime(2026, 8, 31, 21, 0, tzinfo=actual_jst)))
+    written = dict(zip(_POST_HEADER_JA, tabs["投稿DB"][1]))
+    assert written["投稿日時"] == "26/08/31 12:00"  # 21:00 JST = 12:00 UTC
+    got = store.get_post("p1:youtube").published_at
+    assert got == datetime(2026, 8, 31, 21, 0, tzinfo=actual_jst)  # 同じ瞬間として一致
 
 
 def test_sheets_upsert_post_updates_existing_row_in_place():

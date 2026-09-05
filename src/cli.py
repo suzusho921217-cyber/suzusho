@@ -712,7 +712,7 @@ def cmd_metrics(args: argparse.Namespace) -> int:
         due = due_snapshots(post, now, existing_labels=existing)
         if not due:
             continue
-        raw = get_publisher(post.platform).fetch_metrics(post.platform_post_id)
+        raw = get_publisher(post.platform, brand=post.brand).fetch_metrics(post.platform_post_id)
         for label in due:
             store.append_snapshot(collect_snapshot(post, label, raw, now=now))
             collected += 1
