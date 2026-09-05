@@ -1,0 +1,24 @@
+# コスト・投資管理（§13）
+# 実際の動画API単価は契約時に再計算する。
+
+currency: JPY
+validation_window_days: 90
+
+# ★Gemini API はプリペイド（前払い）。2026-09-02 に ¥5,000 分を購入・オートチャージ OFF。
+#   → Google 側の絶対上限は ¥5,000。このシステムの上限もそれに合わせて先に止める。
+#   クレジットを買い足したら、下の数字も上げること。
+total_investment_cap: 5000
+monthly_budget: 5000
+daily_budget: 400
+
+retry_budget_ratio: 0.20           # 再生成による追加費の上限（月次予算に対する比率）
+
+brand_budget:                      # 1ブランドの上限
+  cat: 3000
+  dog: 3000
+  adult: 1500
+
+automatic_stop_ratio: 0.95         # 上限95%で新規生成停止、既存投稿/分析のみ継続
+
+# 参考: Veo 3.1 Lite 1080p ¥12/s。8秒 = ¥96/本。
+#   ¥5,000 ≒ 約50本。テスト＋最初の運用に十分。1日4本ペースなら約2週間分。

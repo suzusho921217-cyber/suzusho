@@ -1,0 +1,25 @@
+# シークレット類（§5: コード/Sheets に保存しない）
+*.json
+!config/**/*.json
+.env
+.env.*
+service_account*.json
+*token*.json
+credentials*.json
+
+# 実行時の一時物
+.state/
+media_out/
+downloads/
+*.mp4
+*.mov
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+
+.DS_Store

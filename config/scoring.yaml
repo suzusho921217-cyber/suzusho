@@ -1,0 +1,36 @@
+# スコアリングと自動配分（§11）
+
+allocation:
+  total_daily_slots: 6              # 1日6本を固定
+  exploit_ratio: 0.70              # 既存勝ちパターン
+  explore_ratio: 0.30              # 新企画・新フック・新尺
+  brand_max_ratio: 0.60           # 1ブランド配分上限
+  brand_min_explore_posts: 1      # 各ブランド最低探索を一定周期で確保
+  eval_windows_days: [7, 30]      # 直近7日＋30日を併用
+  outlier_guard: true             # 1本の超バズで全配分を変えない
+
+# 収益化前スコア（媒体で取得できない指標は重みを再正規化）
+score_weights_pre_monetization:
+  completion_rate: 0.30
+  share_rate: 0.25
+  follow_rate: 0.25
+  comment_rate: 0.10
+  cost_efficiency: 0.10           # cost_per_1k_views の逆数を正規化
+
+# 収益化後は実収益・利益率の比重を上げる
+score_weights_post_monetization:
+  roi: 0.35
+  revenue_jpy: 0.20
+  completion_rate: 0.15
+  follow_rate: 0.15
+  share_rate: 0.10
+  comment_rate: 0.05
+
+# 学習エンジン（§11）— 勝ちタグ抽出のパラメータ
+learning:
+  monetized: false                 # true で score_weights_post_monetization に切替
+  score_snapshot_order: ["7d", "72h", "24h", "latest"]  # スコアに使う snapshot の優先順
+  eval_window_weights:             # 直近7日と30日のスコアの合成比（§11）
+    "7": 0.6
+    "30": 0.4
+  min_posts_for_winner: 3          # 直近30日でこの本数未満の組は勝ちタグにしない（異常値ガード §11）

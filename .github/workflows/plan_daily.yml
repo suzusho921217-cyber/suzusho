@@ -1,0 +1,12 @@
+# §5 plan_daily: 1日1回、前日までの成績から当日6本を配分・企画。
+name: plan_daily
+on:
+  schedule:
+    - cron: "30 21 * * *"  # 06:30 JST（policy_sync の後）
+  workflow_dispatch:
+jobs:
+  call:
+    uses: ./.github/workflows/_reusable.yml
+    with:
+      command: plan-daily
+    secrets: inherit

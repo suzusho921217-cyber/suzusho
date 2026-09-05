@@ -1,0 +1,19 @@
+# TikTok 固有ポリシーチェック（§8 §9）。_common.yaml にマージされる。
+# 現在 config/platforms.yaml で無効。有効化時に公式を精査すること（§20）:
+#   https://www.tiktok.com/community-guidelines/en/
+#   https://www.tiktok.com/creator-academy/en/article/ai-generated-content-label
+# 詳細な要約は docs/platform_policies.md を参照。
+
+version: "2026-08-30"
+source_checked_at: "2026-08-30"
+
+# 実写級AI生成は AIGC ラベル必須（禁止ではなく開示）。publish 段階で付与する。
+ai_disclosure_required: true
+
+checks:
+  - id: tt_adult_block
+    applies_to: [prompt]
+    when:
+      brand_in: [adult]
+    decision: SKIP_PLATFORM
+    message: "adult は当面 TikTok へ投稿しない（性的示唆判定リスク。docs/platform_policies.md）"

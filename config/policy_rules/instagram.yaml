@@ -1,0 +1,19 @@
+# Instagram / Meta 固有ポリシーチェック（§8 §9）。_common.yaml にマージされる。
+# 現在 config/platforms.yaml で無効。有効化時に公式を精査すること（§20）:
+#   https://transparency.meta.com/policies/community-standards/adult-nudity-sexual-activity/
+#   https://about.fb.com/news/2024/04/metas-approach-to-labeling-ai-generated-content-and-manipulated-media/
+# 詳細な要約は docs/platform_policies.md を参照。
+
+version: "2026-08-30"
+source_checked_at: "2026-08-30"
+
+# フォトリアルな動画/音声のAI生成は自己開示が必要（"AI Info" ラベル）。publish 段階で付与。
+ai_disclosure_required: true
+
+checks:
+  - id: ig_adult_block
+    applies_to: [prompt]
+    when:
+      brand_in: [adult]
+    decision: SKIP_PLATFORM
+    message: "adult は当面 Instagram へ投稿しない（フィクションの性的描写も18+制限。docs/platform_policies.md）"

@@ -1,0 +1,36 @@
+# policy_sync が監視する RSS/Atom フィード（§5 §8 §20）。
+# API 規約・技術変更は機械可読フィードで追える。コンテンツポリシー本体
+# （性的表現 / AI開示 / 暴力 など）はフィードが無いため、下の manual_review_urls を
+# 人手で定期確認する（docs/platform_policies.md の確認日を更新する）。
+
+# 新着エントリを検知したら policy-sync は該当媒体を .state/policy_sync.json で stale にし、
+# 非0で終了する（GitHub Actions のジョブ失敗 = 失敗通知メール）。
+
+feeds:
+  - platform: youtube
+    name: data-api-revision-history
+    url: https://developers.google.com/static/youtube/v3/feeds/data-api-revision-history.xml
+  - platform: youtube
+    name: analytics-api-revision-history
+    url: https://developers.google.com/static/youtube/analytics/feeds/analytics-api-revision-history.xml
+  - platform: x
+    name: api-changelog
+    url: https://docs.x.com/changelog/rss.xml
+  # TikTok / Meta の開発者 changelog は RSS が無い（HTML のみ）。
+  # ページhash 監視は policy_sync の次スライスで追加する。
+
+# フィードが無く目視確認が必要なページ（policy_sync は取得しない。運用チェックリスト用）。
+manual_review_urls:
+  youtube:
+    - https://support.google.com/youtube/answer/2802002    # ヌード・性的コンテンツ
+    - https://support.google.com/youtube/answer/14328491   # AI生成物の開示
+    - https://support.google.com/youtube/answer/1311392    # 収益化（inauthentic content）
+  tiktok:
+    - https://www.tiktok.com/community-guidelines/en/
+    - https://developers.tiktok.com/doc/changelog
+  instagram:
+    - https://transparency.meta.com/policies/community-standards/adult-nudity-sexual-activity/
+    - https://developers.facebook.com/docs/instagram-platform/changelog
+  x:
+    - https://help.x.com/en/rules-and-policies/adult-content
+    - https://help.x.com/en/rules-and-policies/manipulated-media

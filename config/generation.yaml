@@ -1,0 +1,36 @@
+# 動画生成（§12）
+
+# 使うプロバイダ。環境変数 VIDEO_PROVIDER が優先。
+#   mock … はりぼて（E2E 用・無料）
+#   veo  … Google Gemini API の Veo（pay-as-you-go・月額サブスク不要）
+provider: mock
+
+veo:
+  # 画質が物足りなければ veo-3.1-fast-generate-preview に変えるだけ（Fast）。
+  # veo-3.1-generate-preview は Standard（高いので通常は使わない）。
+  model: veo-3.1-lite-generate-preview
+  # ★Lite は 1080p だと 8 秒固定（6 秒 1080p は 400 エラー）。720p の方が柔軟＆安い。
+  resolution: "720p"           # 720p / 1080p
+  aspect_ratio: "9:16"         # 縦型ショート
+  # Veo は 4 / 6 / 8 秒のみ。企画の目標尺以上で最小のものを選ぶ（無ければ 8）。
+  allowed_durations: [4, 6, 8]
+
+  # 15秒などにしたいとき: base 8秒 → extend(+7秒/回) を同期で繰り返す（§12）。
+  #   0 または未設定 = 単発クリップ（extend しない）。
+  #   15 = 1本あたり 8s生成 + 7s extend ≈ 実費2倍(¥128前後)・生成時間も約2倍。
+  # ★2026-09-05 実API確認: lite モデルは extend 非対応(400 "Video extension is not
+  #   allowed for this model")。fast/standard に上げない限り 0 のまま(単発クリップ)。
+  target_total_sec: 0
+
+  # 概算原価（円/秒）。予算ゲート（§13）と原価記録に使う。
+  # ★実請求で確認して更新すること（$1=¥150 換算の目安）:
+  #   Veo 3.1 Lite 720p ≈ $0.05/s → ¥8   /  1080p ≈ $0.08/s → ¥12
+  price_jpy_per_sec: 8
+
+  # 認証: gemini-3.6-flash と同じ Gemini API キー。この順で環境変数を見る。
+  api_key_envs: [GEMINI_API_KEY, GOOGLE_API_KEY]
+  download_dir: .state/generation
+  poll_interval_sec: 15
+  # Lite モデルは negative_prompt 非対応（400 が返る）。false なら禁止事項はプロンプト本文に残す。
+  # Standard/Fast に上げるとき true にできる。
+  use_negative_prompt: false

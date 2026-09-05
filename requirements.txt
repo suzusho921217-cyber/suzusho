@@ -1,0 +1,17 @@
+# コア
+PyYAML>=6.0
+
+# Google Sheets（§10）— サービスアカウント認証
+google-api-python-client>=2.130
+google-auth>=2.30
+
+# 動画生成（§12）— Veo は Gemini API 経由（pay-as-you-go）
+google-genai>=1.0             # VIDEO_PROVIDER=veo のとき必要
+
+# 媒体API（実装時に精査）
+google-auth-oauthlib>=1.2      # YouTube OAuth
+requests>=2.32                 # TikTok / Meta / X REST
+
+# 開発
+pytest>=8.0
+ruff>=0.6

@@ -1,0 +1,12 @@
+# §5 metrics: 24h/72h/7d 指標回収。
+name: metrics
+on:
+  schedule:
+    - cron: "0 */6 * * *"
+  workflow_dispatch:
+jobs:
+  call:
+    uses: ./.github/workflows/_reusable.yml
+    with:
+      command: metrics
+    secrets: inherit

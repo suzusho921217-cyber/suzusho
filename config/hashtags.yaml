@@ -1,0 +1,49 @@
+# ハッシュタグ / タグ選定（§9 publish 段階）
+#
+# 市場: 日本を主軸に、海外も狙う → 日本語タグと英語(グローバル)タグを両方混ぜる。
+# 考え方: 「必ず付ける定番（always）」＋「プールから日替わりで数本（pool）」。
+#   always に 日本語コア＋英語コア を両方。pool は 中〜ニッチ を JP/EN 混在で。
+# ★実運用では TikTok Creative Center・YouTube 検索・競合投稿を見て月1で見直す。
+#   learning は本文タグ（concept_tag 等）で回すので、ここはあくまで露出用。
+
+cat:
+  youtube:
+    always: ["#Shorts", "#猫", "#cat", "#cats"]
+    pool: ["#子猫", "#kitten", "#かわいい猫", "#cutecat", "#catsofyoutube", "#catlover",
+           "#ねこ", "#癒し", "#funnycats", "#kittensofyoutube", "#猫のいる暮らし"]
+    per_video: 4
+  tiktok:
+    always: ["#猫", "#cat", "#catsoftiktok", "#fyp"]
+    pool: ["#子猫", "#kitten", "#かわいい", "#cutecat", "#foryou", "#foryoupage",
+           "#猫好きさんと繋がりたい", "#catlover", "#funnycat", "#kittensoftiktok", "#ねこ"]
+    per_video: 5
+  instagram:
+    always: ["#猫", "#cat", "#catstagram", "#catsofinstagram"]
+    pool: ["#ねこすたぐらむ", "#子猫", "#kitten", "#kittensofinstagram", "#にゃんすたぐらむ",
+           "#cutecat", "#catlover", "#猫のいる暮らし", "#instacat", "#ペット", "#癒し"]
+    per_video: 6
+  x:
+    always: ["#猫", "#cat"]
+    pool: ["#猫好き", "#子猫", "#kitten", "#cutecat", "#かわいい", "#catlover", "#ねこ"]
+    per_video: 3
+
+dog:
+  youtube:
+    always: ["#Shorts", "#犬", "#dog", "#dogs"]
+    pool: ["#子犬", "#puppy", "#かわいい犬", "#cutedog", "#dogsofyoutube", "#doglover",
+           "#いぬ", "#柴犬", "#shiba", "#puppiesofyoutube", "#犬のいる暮らし"]
+    per_video: 4
+  tiktok:
+    always: ["#犬", "#dog", "#dogsoftiktok", "#fyp"]
+    pool: ["#子犬", "#puppy", "#かわいい", "#cutedog", "#foryou", "#foryoupage",
+           "#犬好きさんと繋がりたい", "#doglover", "#funnydog", "#puppiesoftiktok", "#柴犬"]
+    per_video: 5
+  instagram:
+    always: ["#犬", "#dog", "#dogstagram", "#dogsofinstagram"]
+    pool: ["#いぬすたぐらむ", "#子犬", "#puppy", "#puppiesofinstagram", "#わんすたぐらむ",
+           "#cutedog", "#doglover", "#犬のいる暮らし", "#instadog", "#ペット", "#柴犬"]
+    per_video: 6
+  x:
+    always: ["#犬", "#dog"]
+    pool: ["#犬好き", "#子犬", "#puppy", "#cutedog", "#かわいい", "#doglover", "#柴犬"]
+    per_video: 3

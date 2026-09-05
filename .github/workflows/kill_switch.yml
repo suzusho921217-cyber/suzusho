@@ -1,0 +1,12 @@
+# §5 kill_switch: 警告・連続失敗・予算超過時に対象ブランド/媒体を停止。
+name: kill_switch
+on:
+  schedule:
+    - cron: "15 * * * *"
+  workflow_dispatch:
+jobs:
+  call:
+    uses: ./.github/workflows/_reusable.yml
+    with:
+      command: kill-switch
+    secrets: inherit

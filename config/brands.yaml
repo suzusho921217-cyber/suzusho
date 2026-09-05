@@ -1,0 +1,37 @@
+# ブランド定義（§3 スコープ / §7 大人向け安全設計）
+# name / 禁止表現 / 対象媒体 / 配分上限は運用で調整する。
+
+brands:
+  cat:
+    display_name: "（未確定）猫専門"
+    enabled: true
+    daily_quota_initial: 2
+    max_allocation_ratio: 0.6        # §11 1ブランド配分上限
+    policy_risk_default: LOW
+    banned_expressions:
+      - "実在の人物・団体の模倣"
+    target_platforms: [youtube, tiktok, instagram, x]
+
+  dog:
+    display_name: "（未確定）犬専門"
+    enabled: true
+    daily_quota_initial: 2
+    max_allocation_ratio: 0.6
+    policy_risk_default: LOW
+    banned_expressions:
+      - "実在の人物・団体の模倣"
+    target_platforms: [youtube, tiktok, instagram, x]
+
+  adult:
+    display_name: "（未確定）大人向け（非露骨・成人固定キャラ）"
+    enabled: false                   # §17 Phase 3 で有効化
+    daily_quota_initial: 2
+    max_allocation_ratio: 0.6
+    policy_risk_default: HIGH
+    banned_expressions:
+      - "未成年・若年に見える表現"
+      - "露骨な裸体・性行為"
+      - "各媒体の成人向けコンテンツ規約に抵触する表現"
+    require_double_check: true        # §7 プロンプト段階＋完成動画段階
+    auto_hold_on_policy_diff: true    # §7 / §14
+    target_platforms: [youtube, tiktok, instagram, x]

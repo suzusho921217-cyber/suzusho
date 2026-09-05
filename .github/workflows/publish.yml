@@ -1,0 +1,12 @@
+# §5 publish: 投稿時間ごとに媒体別ポリシー再判定→投稿。
+name: publish
+on:
+  schedule:
+    - cron: "0 3,9,12 * * *"
+  workflow_dispatch:
+jobs:
+  call:
+    uses: ./.github/workflows/_reusable.yml
+    with:
+      command: publish
+    secrets: inherit

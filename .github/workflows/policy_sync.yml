@@ -1,0 +1,45 @@
+# §5 policy_sync: 1日1回、媒体の RSS/Atom フィードを確認。新着（＝規約/ポリシー変更の
+# 可能性）を検知したら該当媒体を stale にし、非0終了 = ジョブ失敗 = 失敗通知メール。
+#
+# state 永続化: .state/policy_sync_feeds.json（前回見たエントリ）を actions/cache でラン間保持。
+# restore → run → save(always) の3段で、新着検知による非0終了時もキャッシュを更新する。
+#
+# TODO(§15): 検知した stale フラグ(.state/policy_sync.json)を publish ワークフローへ伝播する
+# 仕組みは未実装（クロスワークフロー state 共有 = Sheets/state-store 側で対応）。
+# 現時点で確実に効くのは「ジョブ失敗による通知」。
+name: policy_sync
+on:
+  schedule:
+    - cron: "0 21 * * *"   # 06:00 JST
+  workflow_dispatch:
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - run: pip install -r requirements.txt
+
+      - name: restore policy_sync state
+        uses: actions/cache/restore@v4
+        with:
+          path: .state
+          key: policy-sync-state-
+          restore-keys: |
+            policy-sync-state-
+
+      - name: run
+        run: python -m src.cli policy-sync
+
+      - name: save policy_sync state
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: .state
+          key: policy-sync-state-${{ github.run_id }}-${{ github.run_attempt }}

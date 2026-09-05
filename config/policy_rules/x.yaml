@@ -1,0 +1,21 @@
+# X 固有ポリシーチェック（§8 §9）。_common.yaml にマージされる。
+# 現在 config/platforms.yaml で無効。有効化時に公式を精査すること（§20）:
+#   https://help.x.com/en/rules-and-policies/adult-content
+#   https://help.x.com/en/rules-and-policies/manipulated-media
+# 詳細な要約は docs/platform_policies.md を参照。
+
+version: "2026-08-30"
+source_checked_at: "2026-08-30"
+
+# 実写級AI生成はラベル必須（地域により投稿前の宣言義務）。publish 段階で付与。
+ai_disclosure_required: true
+
+# X は同意制作・非露骨・センシティブラベル付きなら adult 可（4媒体で唯一）。
+# ただしプロフィール画像/ヘッダー等の目立つ場所には不可。
+checks:
+  - id: x_adult_needs_sensitive_label
+    applies_to: [video]
+    when:
+      brand_in: [adult]
+    decision: REWRITE
+    message: "adult: センシティブメディアラベル必須＋プロフィール系メディアに使わない（publish で担保）"

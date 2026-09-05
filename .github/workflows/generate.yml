@@ -1,0 +1,13 @@
+# §5 generate: 生成ジョブ投入のみ。生成待ちで Runner を占有しない。
+name: generate
+on:
+  schedule:
+    - cron: "0 22 * * *"
+    - cron: "0 1 * * *"
+  workflow_dispatch:
+jobs:
+  call:
+    uses: ./.github/workflows/_reusable.yml
+    with:
+      command: generate
+    secrets: inherit

@@ -1,0 +1,27 @@
+# YouTube 固有ポリシーチェック（§8 §9）。_common.yaml にマージされる。
+# 実装/運用時に公式ポリシーを再確認すること（§20）:
+#   https://support.google.com/youtube/answer/2802002   (ヌード・性的コンテンツ)
+#   https://support.google.com/youtube/answer/14328491  (AI生成物の開示)
+#   https://support.google.com/youtube/answer/1311392   (収益化: inauthentic content)
+# 詳細な要約は docs/platform_policies.md を参照。
+
+version: "2026-08-30"
+source_checked_at: "2026-08-30"
+
+# 実写級AI生成は「Altered or synthetic content」開示が必須。publish 段階で付与する。
+ai_disclosure_required: true
+
+checks:
+  - id: yt_oddity_cap
+    applies_to: [prompt]
+    when:
+      max_oddity_level: 4
+    decision: REGENERATE
+    message: "違和感レベルが高すぎ。誤解を招くコンテンツと判定される懸念"
+
+  - id: yt_adult_hold
+    applies_to: [prompt]
+    when:
+      brand_in: [adult]
+    decision: SKIP_PLATFORM
+    message: "adult ブランドは当面 YouTube へ投稿しない（§7 要再検討）"

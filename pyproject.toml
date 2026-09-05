@@ -1,0 +1,9 @@
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+# ローカルは現状 Python 3.9（Mac移行未完）。CI/GitHub Actions は 3.12。
+# ランタイム互換のため 3.9 を下限に合わせておく。3.12 導入後に引き上げる。
+target-version = "py39"

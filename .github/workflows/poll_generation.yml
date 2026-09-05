@@ -1,0 +1,12 @@
+# §5 poll_generation: 10〜30分間隔で生成完了確認→DL→品質判定→加工。
+name: poll_generation
+on:
+  schedule:
+    - cron: "*/20 * * * *"
+  workflow_dispatch:
+jobs:
+  call:
+    uses: ./.github/workflows/_reusable.yml
+    with:
+      command: poll-generation
+    secrets: inherit

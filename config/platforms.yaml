@@ -1,0 +1,59 @@
+# 媒体設定（§9 実装前提 / §20 公式API）
+# policy_url は policy_sync.yml が版差分を監視する対象（§5）。
+# 実際の scope / 指標名は実装時に公式ドキュメントで再確認する。
+
+platforms:
+  youtube:
+    enabled: true
+    api: "YouTube Data API v3 (videos.insert) + YouTube Analytics API"
+    policy_urls:
+      - https://developers.google.com/youtube/v3/docs/videos
+      - https://developers.google.com/youtube/analytics/metrics
+    metrics_available: [views, engagedViews, averageViewDuration, shares, subscribersGained, estimatedRevenue]
+    notes: "未監査APIプロジェクトのアップロードは private 制限があり得る。監査前提。"
+    secret_env:
+      - YOUTUBE_OAUTH_CLIENT_ID
+      - YOUTUBE_OAUTH_CLIENT_SECRET
+      - YOUTUBE_OAUTH_REFRESH_TOKEN
+
+  tiktok:
+    enabled: false
+    api: "Content Posting API (Direct Post) + Display API"
+    policy_urls:
+      - https://developers.tiktok.com/docs/en/content-posting-api-get-started
+      - https://developers.tiktok.com/docs/en/display-api-overview
+    metrics_available: [views, likes, comments, shares]
+    notes: "video.publish 承認が必要。未監査クライアント投稿は private。Direct Post は明示的同意等の UX 要件あり。"
+    secret_env:
+      - TIKTOK_CLIENT_KEY
+      - TIKTOK_CLIENT_SECRET
+      - TIKTOK_ACCESS_TOKEN
+      - TIKTOK_REFRESH_TOKEN
+
+  instagram:
+    enabled: false
+    api: "Instagram Reels Publishing + Insights (実装開始時に Meta 公式で再確認)"
+    policy_urls:
+      - https://developers.facebook.com/docs/instagram-platform
+    metrics_available: []            # 実装時に確定
+    notes: "アカウント種別・権限・指標を実装開始時に再検証（§3 §9 §19）。"
+    secret_env:
+      - META_APP_ID
+      - META_APP_SECRET
+      - IG_ACCESS_TOKEN
+      - IG_BUSINESS_ACCOUNT_ID
+
+  x:
+    enabled: false
+    api: "X API v2 + Media Upload"
+    policy_urls:
+      - https://docs.x.com/x-api/media/quickstart/best-practices
+      - https://docs.x.com/x-api/fundamentals/metrics
+      - https://docs.x.com/x-api/posts/create-post
+    metrics_available: [impressions, video_views, playback_25, playback_50, playback_75, playback_100]
+    notes: "pay-per-use。費用上限を必ず設定（§13）。"
+    secret_env:
+      - X_API_KEY
+      - X_API_SECRET
+      - X_ACCESS_TOKEN
+      - X_ACCESS_TOKEN_SECRET

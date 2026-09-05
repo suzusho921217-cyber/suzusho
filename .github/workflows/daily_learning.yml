@@ -1,0 +1,12 @@
+# §5 daily_learning: スコア計算・勝ちタグ抽出・翌日への反映。
+name: daily_learning
+on:
+  schedule:
+    - cron: "0 20 * * *"  # 05:00 JST（翌日の plan_daily の前）
+  workflow_dispatch:
+jobs:
+  call:
+    uses: ./.github/workflows/_reusable.yml
+    with:
+      command: daily-learning
+    secrets: inherit

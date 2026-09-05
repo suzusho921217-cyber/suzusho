@@ -1,0 +1,43 @@
+# 全媒体共通のポリシーチェック（§8）。各 <platform>.yaml にマージされる。
+# policy_sync がこのファイル群の version を公式ポリシーと突き合わせ、
+# 食い違ったら該当媒体を stale にする（is_policy_stale）。
+# 各媒体ポリシーの要約は docs/platform_policies.md（最終確認 2026-08-30）。
+
+version: "2026-08-30"
+
+# when に使える条件タイプ（決め打ち）:
+#   text_matches      … concept_tag / hook_type / notes を対象にした正規表現（re.search, IGNORECASE）
+#   max_oddity_level  … plan.oddity_level がこの値を超えたら発火
+#   max_reality_level … plan.reality_level がこの値を超えたら発火
+#   brand_in          … plan.brand がリストに含まれたら発火
+#   policy_risk_in    … plan.policy_risk がリストに含まれたら発火
+# 複数キーを書いた場合は AND。
+
+checks:
+  - id: no_real_person_mimicry
+    applies_to: [prompt]
+    when:
+      text_matches: "(実在|本物|そっくり)[^。]{0,8}(人物|有名人|芸能人|政治家|社長|CEO)"
+    decision: HOLD
+    message: "実在の人物・団体の模倣の疑い（§6 禁止表現）"
+
+  - id: real_brand_or_logo
+    applies_to: [prompt]
+    when:
+      text_matches: "(実在|本物)[^。]{0,6}(ブランド|ロゴ|商標|企業)"
+    decision: REWRITE
+    message: "実在ブランド/ロゴへの言及。プロンプトから除外して再判定"
+
+  - id: violence_or_gore
+    applies_to: [prompt]
+    when:
+      text_matches: "(流血|グロ|殺害|暴行|死体|blood|gore)"
+    decision: REGENERATE
+    message: "暴力・流血表現の疑い"
+
+  - id: high_risk_needs_review
+    applies_to: [prompt]
+    when:
+      policy_risk_in: [HIGH]
+    decision: HOLD
+    message: "HIGH RISK 企画は投稿前に人間確認（§7 §14）"
