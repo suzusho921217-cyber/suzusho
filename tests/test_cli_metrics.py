@@ -36,12 +36,12 @@ def test_metrics_collects_and_writes_performance(published):
     assert rec["snapshots"]["latest"]["views"] > 0
 
 
-def test_metrics_is_incremental(published):
+def test_metrics_latest_is_upserted_not_duplicated(published):
     main(["metrics"])
     main(["metrics"])
     snaps = json.loads((published / "db" / "snapshots.json").read_text(encoding="utf-8"))
-    # latest は毎回追記されるので 2 回 × 6 投稿 = 12
-    assert len(snaps) == 12
+    # latest は履歴を残さず上書きされるので、2回実行しても 6投稿分のまま
+    assert len(snaps) == 6
 
 
 class _FakeAccountPublisher(Publisher):

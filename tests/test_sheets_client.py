@@ -86,6 +86,33 @@ def test_snapshot_append_and_list(tmp_path):
     assert len(only) == 1 and only[0].views == 1000 and only[0].shares == 30
 
 
+def test_upsert_snapshot_replaces_same_post_and_label(tmp_path):
+    store = LocalStore(tmp_path)
+    store.upsert_snapshot(PerformanceSnapshot(
+        post_key="p1:youtube", snapshot="latest",
+        collected_at=datetime(2026, 9, 2, tzinfo=JST), views=10,
+    ))
+    store.upsert_snapshot(PerformanceSnapshot(
+        post_key="p1:youtube", snapshot="latest",
+        collected_at=datetime(2026, 9, 3, tzinfo=JST), views=20,
+    ))
+    snaps = store.list_snapshots(post_key="p1:youtube")
+    assert len(snaps) == 1 and snaps[0].views == 20  # 上書きされ、履歴は残らない
+
+
+def test_upsert_snapshot_keeps_other_labels_separate(tmp_path):
+    store = LocalStore(tmp_path)
+    store.upsert_snapshot(PerformanceSnapshot(
+        post_key="p1:youtube", snapshot="24h",
+        collected_at=datetime(2026, 9, 2, tzinfo=JST), views=10,
+    ))
+    store.upsert_snapshot(PerformanceSnapshot(
+        post_key="p1:youtube", snapshot="latest",
+        collected_at=datetime(2026, 9, 2, tzinfo=JST), views=20,
+    ))
+    assert len(store.list_snapshots(post_key="p1:youtube")) == 2
+
+
 def test_account_daily_upsert_by_composite_key(tmp_path):
     store = LocalStore(tmp_path)
     row = AccountDaily(date="2026-09-02", brand=Brand.CAT, platform=Platform.YOUTUBE,
@@ -277,6 +304,22 @@ def test_sheets_snapshot_append_and_filter():
     assert len(store.list_snapshots()) == 2
     only = store.list_snapshots(post_key="p1:youtube")
     assert len(only) == 1 and only[0].views == 1000 and only[0].shares == 30
+
+
+def test_sheets_upsert_snapshot_replaces_same_post_and_label():
+    tabs = {"パフォーマンスDB": [_SNAPSHOT_HEADER_JA]}
+    store = _fake_store(tabs)
+    store.upsert_snapshot(PerformanceSnapshot(
+        post_key="p1:youtube", snapshot="latest",
+        collected_at=datetime(2026, 9, 2, tzinfo=JST), views=10,
+    ))
+    store.upsert_snapshot(PerformanceSnapshot(
+        post_key="p1:youtube", snapshot="latest",
+        collected_at=datetime(2026, 9, 3, tzinfo=JST), views=20,
+    ))
+    assert len(tabs["パフォーマンスDB"]) == 2  # 見出し + データ1行のみ（追記されない）
+    snaps = store.list_snapshots(post_key="p1:youtube")
+    assert len(snaps) == 1 and snaps[0].views == 20
 
 
 def test_sheets_account_daily_upsert_by_composite_key():

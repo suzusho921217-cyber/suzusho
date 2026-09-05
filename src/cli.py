@@ -753,7 +753,12 @@ def cmd_metrics(args: argparse.Namespace) -> int:
                 if snap.followers_before is None:
                     snap.followers_before = followers_before
                 snap.followers_after = current_followers
-            store.append_snapshot(snap)
+            # "latest" は毎回この投稿の現在値を1行で持ちたい（履歴を残さず上書き）。
+            # 24h/72h/7d はその時点の記録として一度きり追記する。
+            if label == "latest":
+                store.upsert_snapshot(snap)
+            else:
+                store.append_snapshot(snap)
             collected += 1
 
     # 今回取得できたフォロワー数を当日分としてアカウント日次DBに反映（既存フィールドは維持）

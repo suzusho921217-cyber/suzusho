@@ -140,6 +140,14 @@ class Store(abc.ABC):
     def append_snapshot(self, snap: PerformanceSnapshot) -> None: ...
 
     @abc.abstractmethod
+    def upsert_snapshot(self, snap: PerformanceSnapshot) -> None:
+        """(post_key, snapshot) が一致する既存行があれば上書き、無ければ追加する。
+
+        "latest" は毎回この投稿の現在値を1行で持ちたい（履歴を残さない）ため、
+        単純追記の append_snapshot ではなく upsert を使う（§10.2）。
+        """
+
+    @abc.abstractmethod
     def list_snapshots(self, *, post_key: str | None = None) -> list[PerformanceSnapshot]: ...
 
     @abc.abstractmethod
@@ -192,6 +200,16 @@ class LocalStore(Store):
     # パフォーマンスDB (§10.2) — 追記リスト
     def append_snapshot(self, snap: PerformanceSnapshot) -> None:
         data = self._read("snapshots.json", [])
+        data.append(snapshot_to_row(snap))
+        self._write("snapshots.json", data)
+
+    def upsert_snapshot(self, snap: PerformanceSnapshot) -> None:
+        data = self._read("snapshots.json", [])
+        for i, row in enumerate(data):
+            if row.get("post_key") == snap.post_key and row.get("snapshot") == snap.snapshot:
+                data[i] = snapshot_to_row(snap)
+                self._write("snapshots.json", data)
+                return
         data.append(snapshot_to_row(snap))
         self._write("snapshots.json", data)
 
@@ -507,12 +525,27 @@ class SheetsStore(Store):
             posts = [p for p in posts if p.published_at and p.published_at.isoformat() >= since]
         return sorted(posts, key=lambda p: p.post_key)
 
-    # --- パフォーマンスDB（追記のみ） -----------------------------------
+    # --- パフォーマンスDB ------------------------------------------------
 
     def append_snapshot(self, snap: PerformanceSnapshot) -> None:
         self._upsert_row(
             self._TAB_SNAPSHOT, _SNAPSHOT_HEADERS_JA, set(_SNAPSHOT_NUMERIC),
             snapshot_to_row(snap), match_row_number=None,
+            value_maps=_SNAPSHOT_VALUE_MAPS, dt_keys=_SNAPSHOT_DT_KEYS, units=_SNAPSHOT_UNITS,
+        )
+
+    def upsert_snapshot(self, snap: PerformanceSnapshot) -> None:
+        _, rows = self._rows_with_index(
+            self._TAB_SNAPSHOT, _SNAPSHOT_HEADERS_JA, set(_SNAPSHOT_NUMERIC),
+            _SNAPSHOT_VALUE_MAPS, _SNAPSHOT_DT_KEYS, _SNAPSHOT_UNITS,
+        )
+        match = next(
+            (i for i, d in rows if d.get("post_key") == snap.post_key and d.get("snapshot") == snap.snapshot),
+            None,
+        )
+        self._upsert_row(
+            self._TAB_SNAPSHOT, _SNAPSHOT_HEADERS_JA, set(_SNAPSHOT_NUMERIC),
+            snapshot_to_row(snap), match_row_number=match,
             value_maps=_SNAPSHOT_VALUE_MAPS, dt_keys=_SNAPSHOT_DT_KEYS, units=_SNAPSHOT_UNITS,
         )
 
