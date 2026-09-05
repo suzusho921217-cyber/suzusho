@@ -35,17 +35,27 @@ platforms:
       - TIKTOK_REFRESH_TOKEN
 
   instagram:
-    enabled: false
-    api: "Instagram Reels Publishing + Insights (実装開始時に Meta 公式で再確認)"
+    enabled: false                   # Cat Moments の Instagram 未整備のため保留(Dog は実装・実キー確認済み)
+    api: "Instagram Graph API (Instagram Login方式) /media + /media_publish + /insights"
     policy_urls:
       - https://developers.facebook.com/docs/instagram-platform
-    metrics_available: []            # 実装時に確定
-    notes: "アカウント種別・権限・指標を実装開始時に再検証（§3 §9 §19）。"
+    metrics_available: [likes, comments, shares, saved, reach, views]
+    notes: >-
+      動画は一般公開HTTPS URLからの取得方式(video_url)のため、GCSの非公開バケット+
+      署名付きURLで一時公開してから投稿する(publishers/instagram.py)。
+      2026-09-05 実キーで投稿・指標取得とも確認済み(Dog Momentsチャンネル)。
     secret_env:
-      - META_APP_ID
+      - META_APP_ID              # OAuthアプリは共通(全ブランドで同じもの)
       - META_APP_SECRET
-      - IG_ACCESS_TOKEN
-      - IG_BUSINESS_ACCOUNT_ID
+      # トークン・ビジネスアカウントIDはチャンネル(ブランド)ごとに別発行。
+      # IG_ACCESS_TOKEN_<BRAND大文字> / IG_BUSINESS_ACCOUNT_ID_<BRAND大文字>（例: _CAT / _DOG）。
+      # 未設定時は IG_ACCESS_TOKEN / IG_BUSINESS_ACCOUNT_ID にフォールバック。
+      - IG_ACCESS_TOKEN_CAT
+      - IG_ACCESS_TOKEN_DOG
+      - IG_BUSINESS_ACCOUNT_ID_CAT
+      - IG_BUSINESS_ACCOUNT_ID_DOG
+      - GCS_BUCKET_NAME           # 動画一時公開用（sheetsと同じサービスアカウントを使用）
+      - GOOGLE_CLOUD_PROJECT
 
   x:
     enabled: false

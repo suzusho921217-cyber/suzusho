@@ -11,6 +11,7 @@ google-genai>=1.0             # VIDEO_PROVIDER=veo のとき必要
 # 媒体API（実装時に精査）
 google-auth-oauthlib>=1.2      # YouTube OAuth
 requests>=2.32                 # TikTok / Meta / X REST
+google-cloud-storage>=2.18     # Instagram投稿用: 動画の一時公開(署名付きURL)
 
 # 開発
 pytest>=8.0

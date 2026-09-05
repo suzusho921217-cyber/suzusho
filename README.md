@@ -35,11 +35,23 @@ AIショートメディア完全自動運用基盤（設計書 v1.0 の実装）
 
 - `publishers.youtube` … `videos.insert` で投稿。冪等性は post_key を非公開タグ
   （`pk:<post_key>`）として埋め込み `search.list(forMine=True)` で照会。AI開示は
-  `status.containsSyntheticMedia`。指標は `videos.list`（views/likes/comments、
-  常時取得可）＋ YouTube Analytics API（engagedViews等、未収益化チャンネルでは
-  失敗しうるので基本指標のみへ自動degrade）。OAuth未設定のためまだ実キーでは未検証。
+  `status.containsSyntheticMedia`（要 `youtube.force-ssl` スコープ。無いとエラー無く
+  無視される。説明欄への明記も二重対策として実施）。指標は `videos.list`（views/
+  likes/comments、常時取得可）＋ YouTube Analytics API（engagedViews等、未収益化
+  チャンネルでは失敗しうるので基本指標のみへ自動degrade）。
+  **2026-09-05 Dog Momentsチャンネルで実キー投稿・確認済み**
+  （https://www.youtube.com/shorts/mQmeSDUdXvw ）。Cat Momentsは審査待ちで未検証。
+- `publishers.instagram` … Instagram Graph API（Instagram Login方式）。動画は
+  「一般公開HTTPS URLから取得」方式(`video_url`)のため、GCSの非公開バケットへ
+  一時アップロード→v4署名付きURL（既定1時間）で取得させる（`GCS_BUCKET_NAME`）。
+  冪等性はキャプション末尾にゼロ幅スペースで挟んだ `pk:<post_key>` を埋め込み、
+  `/media` 一覧から照会。AI開示はAPIに自己申告フィールドが無いためキャプション
+  本文に明記。指標は `/insights`（likes/comments/shares/saved/reach/views。
+  `plays` は廃止済みで `views` が正しいメトリック名 — 実API確認済み）。
+  **2026-09-05 Dog Momentsで実キー投稿・確認済み**
+  （https://www.instagram.com/reel/Dc5r71VgisH/ ）。Cat Momentsは未整備。
 
-未実装スタブ: `policy.check_video`（動画段階）/ publishers の tiktok・instagram・x（youtubeのみ実装済み）。
+未実装スタブ: `policy.check_video`（動画段階）/ publishers の tiktok・x（youtube・instagramは実装済み）。
 `metrics` が成績を集めて `daily-learning` / `kill-switch` の入力 JSON を作る所は未実装（今はサンプル JSON を手で与える）。
 `quality.inspect` の「AI 破綻・不適切表現の検出」は vision LLM 待ち（`policy.check_video` と一緒に実装予定）。
 
@@ -167,10 +179,11 @@ Veo は 1本 **4/6/8 秒のみ**（企画の目標尺以上で最小を自動選
    `production` Environment に Secrets/Variables 設定済み。CI（ruff+pytest）・
    `kill_switch`（毎時cron）とも動作確認済み。ガードレール発火時は Gmail アプリ
    パスワード経由でメール通知（`src/common/notify.py`）。
-   **残: 各媒体の OAuth 認証情報**。YouTubeはチャンネル未作成（ブランディング未決定
-   のため保留中）→ `publishers/youtube.py` は実装・モックテスト済みだが実キー未検証。
-   `publishers/{tiktok,instagram,x}.py` は未実装スタブのまま。
-4. **Phase 0**: 4媒体のAPIで実際に取れる指標を検証。`metrics.collector._ALIASES` を実キーに。
+   ✅ **YouTube・Instagram**: Dog Momentsチャンネル/アカウントで実キー投稿・確認済み
+   （2026-09-05）。Cat Momentsはチャンネル未作成（本人確認審査待ち）のため未整備。
+   **残: TikTok・X の認証情報**。`publishers/{tiktok,x}.py` は未実装スタブのまま。
+4. **Phase 0**: 4媒体のAPIで実際に取れる指標を検証（YouTube/Instagramは実キーで確認済み）。
+   `metrics.collector._ALIASES` を実キーに。
 5. `policy.check_video`（完成動画段階のポリシー判定）— vision LLM が要る。
 
 `docs/economics.md` に初期の収支試算。`ffmpeg` はローカル加工の確認用に `brew install ffmpeg`。
