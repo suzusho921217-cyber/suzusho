@@ -33,7 +33,13 @@ AIショートメディア完全自動運用基盤（設計書 v1.0 の実装）
 - `media.processor` + `cli media` … マスターを 9:16（1080x1920）へ scale+pad、`loudnorm` で音量正規化、媒体別に尺トリム → `.state/media-<date>.json`。`publish` は派生があればそれを使う。**ffmpeg 不在ならスキップ**（`publish` は元動画にフォールバック）
 - 字幕焼き込み / SE / BGM は `MediaVariantSpec` に受け口だけ（素材と設計詰めが必要）
 
-未実装スタブ: `policy.check_video`（動画段階）/ publishers の本番4アダプタ（youtube/tiktok/instagram/x）/ `sheets.SheetsStore`（Google Sheets バックエンド、スプシ作成後）。
+- `publishers.youtube` … `videos.insert` で投稿。冪等性は post_key を非公開タグ
+  （`pk:<post_key>`）として埋め込み `search.list(forMine=True)` で照会。AI開示は
+  `status.containsSyntheticMedia`。指標は `videos.list`（views/likes/comments、
+  常時取得可）＋ YouTube Analytics API（engagedViews等、未収益化チャンネルでは
+  失敗しうるので基本指標のみへ自動degrade）。OAuth未設定のためまだ実キーでは未検証。
+
+未実装スタブ: `policy.check_video`（動画段階）/ publishers の tiktok・instagram・x（youtubeのみ実装済み）。
 `metrics` が成績を集めて `daily-learning` / `kill-switch` の入力 JSON を作る所は未実装（今はサンプル JSON を手で与える）。
 `quality.inspect` の「AI 破綻・不適切表現の検出」は vision LLM 待ち（`policy.check_video` と一緒に実装予定）。
 
@@ -157,8 +163,13 @@ Veo は 1本 **4/6/8 秒のみ**（企画の目標尺以上で最小を自動選
    （鍵は `secrets/sheets-service-account.json`、gitignore済）。`sheets.SheetsStore` 実装済み、
    実シートでのread/write roundtrip確認済み。`.env` の `SHEETS_BACKEND=sheets` で有効化
    （未設定時は既定で `local`＝テストや初回セットアップはこれで良い）。
-3. **各媒体の OAuth 認証情報**、GitHub private repo 作成＋push。
-   → `publishers/{youtube,tiktok,instagram,x}.py` を実装。
+3. ✅ **GitHub private repo**: 完了(2026-09-05)。`suzusho921217-cyber/suzusho`。
+   `production` Environment に Secrets/Variables 設定済み。CI（ruff+pytest）・
+   `kill_switch`（毎時cron）とも動作確認済み。ガードレール発火時は Gmail アプリ
+   パスワード経由でメール通知（`src/common/notify.py`）。
+   **残: 各媒体の OAuth 認証情報**。YouTubeはチャンネル未作成（ブランディング未決定
+   のため保留中）→ `publishers/youtube.py` は実装・モックテスト済みだが実キー未検証。
+   `publishers/{tiktok,instagram,x}.py` は未実装スタブのまま。
 4. **Phase 0**: 4媒体のAPIで実際に取れる指標を検証。`metrics.collector._ALIASES` を実キーに。
 5. `policy.check_video`（完成動画段階のポリシー判定）— vision LLM が要る。
 
