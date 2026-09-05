@@ -86,7 +86,7 @@ def advance_jobs(
 
         try:
             polled = provider.poll(job)
-        except Exception as e:  # provider 側の未捕捉例外（API仕様不一致等）でCLI全体を落とさない
+        except Exception as e:  # noqa: BLE001 - provider側の未捕捉例外でCLI全体を落とさない
             _retry_or_give_up(job, provider, plans_by_id, prefix=f"poll例外: {e}")
             continue
         job.status = polled.status

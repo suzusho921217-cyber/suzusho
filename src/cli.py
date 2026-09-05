@@ -46,7 +46,6 @@ from src.common.guardrails import (
     check_kill_switch,
     combine,
 )
-from src.common.notify import send_alert_email
 from src.common.models import (
     Brand,
     ContentPlan,
@@ -60,6 +59,7 @@ from src.common.models import (
     Post,
     PostStatus,
 )
+from src.common.notify import send_alert_email
 from src.generation.base import get_provider
 from src.generation.pipeline import advance_jobs, submit_plans, summarize
 from src.generation.providers import mock as _mock_provider  # noqa: F401  (@register 副作用)
