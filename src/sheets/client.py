@@ -300,9 +300,13 @@ _SNAPSHOT_UNITS = {
     "views": "回", "engaged_views": "回", "likes": "回", "comments": "回", "shares": "回",
     "impressions": "回", "avg_watch_sec": "秒", "followers_after": "人",
     "followers_delta": "人", "revenue_jpy": "円", "views_delta": "回",
+    "completion_rate": "%",
 }
+# 0〜1の割合をパーセント表示にするフィールド（シート上は ×100 した数値で保持する）
+_PERCENT_FIELDS = {"completion_rate"}
 # 単位付き数値のうち、小数の桁数を絞りたいフィールド（見やすさのため）
 _ROUND_DIGITS: dict[str, int] = {
+    "completion_rate": 1,
     "avg_watch_sec": 1,
     "generation_cost_jpy": 0, "revenue_jpy": 0,
     "daily_revenue_jpy": 0, "daily_api_cost_jpy": 0,
@@ -505,6 +509,8 @@ class SheetsStore(Store):
                     if unit and val.endswith(unit):
                         val = val[: -len(unit)]
                     val = _smart_num(val)
+                    if key in _PERCENT_FIELDS and val is not None:
+                        val = val / 100
                 d[key] = val
             out.append((i, d))
         return header_row, out
@@ -528,7 +534,9 @@ class SheetsStore(Store):
             elif v is not None and key in value_maps:
                 v = value_maps[key].get(v, v)
             elif v is not None and key in units and isinstance(v, (int, float)):
-                num = int(v) if isinstance(v, float) and v.is_integer() else v
+                num = v * 100 if key in _PERCENT_FIELDS else v
+                if key not in _PERCENT_FIELDS and isinstance(num, float) and num.is_integer():
+                    num = int(num)
                 if isinstance(num, float) and key in _ROUND_DIGITS:
                     digits = _ROUND_DIGITS[key]
                     num = round(num, digits)

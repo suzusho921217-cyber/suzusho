@@ -384,6 +384,20 @@ def test_sheets_avg_watch_sec_rounded_to_one_decimal():
     assert written["平均視聴秒数"] == "14.8秒"
 
 
+def test_sheets_completion_rate_shown_as_percent():
+    tabs = {"パフォーマンスDB": [_SNAPSHOT_HEADER_JA]}
+    store = _fake_store(tabs)
+    store.upsert_snapshot(PerformanceSnapshot(
+        post_key="p1:instagram", snapshot="latest",
+        collected_at=datetime(2026, 9, 2, tzinfo=JST), views=10, completion_rate=0.149625,
+    ))
+    written = dict(zip(_SNAPSHOT_HEADER_JA, tabs["パフォーマンスDB"][1]))
+    assert written["完視聴率"] == "15.0%"
+    # 読み込み側は0〜1の割合に戻る（表示は小数第1位までなので丸まる）
+    got = store.list_snapshots(post_key="p1:instagram")[0]
+    assert got.completion_rate == 0.15
+
+
 def test_sheets_instagram_engaged_views_shown_as_na_marker():
     tabs = {"パフォーマンスDB": [_SNAPSHOT_HEADER_JA]}
     store = _fake_store(tabs)
