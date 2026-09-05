@@ -12,9 +12,13 @@ platforms:
     metrics_available: [views, engagedViews, averageViewDuration, shares, subscribersGained, estimatedRevenue]
     notes: "未監査APIプロジェクトのアップロードは private 制限があり得る。監査前提。"
     secret_env:
-      - YOUTUBE_OAUTH_CLIENT_ID
+      - YOUTUBE_OAUTH_CLIENT_ID       # OAuthクライアントは共通(全ブランドで同じもの)
       - YOUTUBE_OAUTH_CLIENT_SECRET
-      - YOUTUBE_OAUTH_REFRESH_TOKEN
+      # リフレッシュトークンはチャンネル(ブランド)ごとに別発行。
+      # YOUTUBE_OAUTH_REFRESH_TOKEN_<BRAND大文字>（例: _CAT / _DOG）。
+      # 未設定時は YOUTUBE_OAUTH_REFRESH_TOKEN にフォールバック(単一アカウント運用向け)。
+      - YOUTUBE_OAUTH_REFRESH_TOKEN_CAT
+      - YOUTUBE_OAUTH_REFRESH_TOKEN_DOG
 
   tiktok:
     enabled: false

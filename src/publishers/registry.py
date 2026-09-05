@@ -8,7 +8,7 @@ PUBLISH_MODE:
 from __future__ import annotations
 
 from src.common.config import env
-from src.common.models import Platform
+from src.common.models import Brand, Platform
 from src.publishers.base import Publisher
 from src.publishers.dryrun import DryRunPublisher
 from src.publishers.instagram import InstagramPublisher
@@ -24,8 +24,10 @@ _LIVE: dict[Platform, type[Publisher]] = {
 }
 
 
-def get_publisher(platform: Platform, *, mode: str | None = None) -> Publisher:
+def get_publisher(
+    platform: Platform, *, mode: str | None = None, brand: Brand | None = None,
+) -> Publisher:
     mode = (mode or env("PUBLISH_MODE", "dryrun") or "dryrun").lower()
     if mode == "dryrun":
         return DryRunPublisher(platform)
-    return _LIVE[platform]()
+    return _LIVE[platform](brand=brand)

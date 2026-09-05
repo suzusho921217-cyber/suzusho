@@ -3,7 +3,10 @@
 API: YouTube Data API v3 `videos.insert`（投稿）+ YouTube Analytics API（指標）。
 注意: 未監査APIプロジェクトのアップロードは private 制限があり得る（監査前提）。
 指標: views / engagedViews / averageViewDuration / shares / subscribersGained / estimatedRevenue
-Secrets(env): YOUTUBE_OAUTH_CLIENT_ID / _SECRET / _REFRESH_TOKEN
+Secrets(env): YOUTUBE_OAUTH_CLIENT_ID / _SECRET は共通（同じOAuthアプリ）。
+リフレッシュトークンはブランド別チャンネルごとに別物（例: 猫チャンネルと犬チャンネル）
+なので `YOUTUBE_OAUTH_REFRESH_TOKEN_<BRAND>`（例: `_CAT` / `_DOG`）を使う。
+未設定なら `YOUTUBE_OAUTH_REFRESH_TOKEN`（単一アカウント運用向けの後方互換）にフォールバック。
 
 冪等性（§15）: サーバ側に自前キーを持てないため、post_key を非公開タグ
 （`pk:<post_key>`。視聴者には表示されない）として埋め込み、`search.list(forMine=True)`
@@ -17,12 +20,13 @@ AI開示（§7 / config/policy_rules/youtube.yaml の ai_disclosure_required）:
 from __future__ import annotations
 
 from src.common.config import env
-from src.common.models import Platform, Post
+from src.common.models import Brand, Platform, Post
 from src.publishers.base import Publisher, PublishRequest, PublishResult
 
 _TOKEN_URI = "https://oauth2.googleapis.com/token"
 _SCOPES = [
     "https://www.googleapis.com/auth/youtube.upload",
+    "https://www.googleapis.com/auth/youtube.readonly",  # videos.list / search.list に必要
     "https://www.googleapis.com/auth/yt-analytics.readonly",
 ]
 
@@ -34,7 +38,8 @@ def _idempotency_tag(post: Post) -> str:
 class YouTubePublisher(Publisher):
     platform = Platform.YOUTUBE
 
-    def __init__(self) -> None:
+    def __init__(self, brand: Brand | None = None) -> None:
+        super().__init__(brand)
         self._youtube_client = None
         self._analytics_client = None
 
@@ -125,12 +130,19 @@ class YouTubePublisher(Publisher):
 
     # --- 内部: 認証 ------------------------------------------------------
 
+    def _refresh_token(self) -> str | None:
+        if self.brand is not None:
+            per_brand = env(f"YOUTUBE_OAUTH_REFRESH_TOKEN_{self.brand.value.upper()}")
+            if per_brand:
+                return per_brand
+        return env("YOUTUBE_OAUTH_REFRESH_TOKEN")
+
     def _credentials(self):
         from google.oauth2.credentials import Credentials
 
         return Credentials(
             token=None,
-            refresh_token=env("YOUTUBE_OAUTH_REFRESH_TOKEN"),
+            refresh_token=self._refresh_token(),
             token_uri=_TOKEN_URI,
             client_id=env("YOUTUBE_OAUTH_CLIENT_ID"),
             client_secret=env("YOUTUBE_OAUTH_CLIENT_SECRET"),

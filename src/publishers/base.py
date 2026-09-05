@@ -12,7 +12,7 @@ from __future__ import annotations
 import abc
 from dataclasses import dataclass
 
-from src.common.models import Platform, Post
+from src.common.models import Brand, Platform, Post
 
 
 @dataclass
@@ -34,7 +34,16 @@ class PublishResult:
 
 
 class Publisher(abc.ABC):
+    """媒体アダプタの基底。
+
+    brand: ブランド別に別アカウント/チャンネルを使う媒体（YouTube等）向け。
+    認証情報の選択に使う（例: `YOUTUBE_OAUTH_REFRESH_TOKEN_<BRAND>`）。
+    """
+
     platform: Platform
+
+    def __init__(self, brand: Brand | None = None) -> None:
+        self.brand = brand
 
     @abc.abstractmethod
     def publish(self, req: PublishRequest) -> PublishResult:

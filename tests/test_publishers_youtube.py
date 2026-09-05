@@ -98,6 +98,25 @@ def _wire(monkeypatch, pub, *, youtube=None, analytics=None):
         monkeypatch.setattr(pub, "_analytics", lambda: analytics)
 
 
+# --- ブランド別リフレッシュトークン選択 ------------------------------------
+
+def test_refresh_token_prefers_per_brand_env(monkeypatch):
+    monkeypatch.setenv("YOUTUBE_OAUTH_REFRESH_TOKEN", "shared-fallback")
+    monkeypatch.setenv("YOUTUBE_OAUTH_REFRESH_TOKEN_CAT", "cat-token")
+    monkeypatch.setenv("YOUTUBE_OAUTH_REFRESH_TOKEN_DOG", "dog-token")
+
+    assert YouTubePublisher(brand=Brand.CAT)._refresh_token() == "cat-token"
+    assert YouTubePublisher(brand=Brand.DOG)._refresh_token() == "dog-token"
+
+
+def test_refresh_token_falls_back_to_shared_env_when_brand_unset(monkeypatch):
+    monkeypatch.setenv("YOUTUBE_OAUTH_REFRESH_TOKEN", "shared-fallback")
+    monkeypatch.delenv("YOUTUBE_OAUTH_REFRESH_TOKEN_CAT", raising=False)
+
+    assert YouTubePublisher(brand=Brand.CAT)._refresh_token() == "shared-fallback"
+    assert YouTubePublisher()._refresh_token() == "shared-fallback"
+
+
 # --- publish -------------------------------------------------------------
 
 def test_publish_uploads_with_idempotency_tag_and_disclosure(monkeypatch, tmp_path):

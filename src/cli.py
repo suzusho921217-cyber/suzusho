@@ -616,7 +616,7 @@ def cmd_publish(args: argparse.Namespace) -> int:
             )
             publisher = (
                 DryRunPublisher(platform, ledger=ledger)
-                if mode == "dryrun" else get_publisher(platform, mode=mode)
+                if mode == "dryrun" else get_publisher(platform, mode=mode, brand=plan.brand)
             )
             guard = guard_map.get((plan.brand.value, platform.value))
             oc = decide_and_publish(plan, platform, req, publisher=publisher, guard=guard)

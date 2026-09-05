@@ -40,7 +40,10 @@ jobs:
           SHEETS_BACKEND: ${{ vars.SHEETS_BACKEND }}      # 未設定なら local
           YOUTUBE_OAUTH_CLIENT_ID: ${{ secrets.YOUTUBE_OAUTH_CLIENT_ID }}
           YOUTUBE_OAUTH_CLIENT_SECRET: ${{ secrets.YOUTUBE_OAUTH_CLIENT_SECRET }}
-          YOUTUBE_OAUTH_REFRESH_TOKEN: ${{ secrets.YOUTUBE_OAUTH_REFRESH_TOKEN }}
+          # チャンネル(ブランド)ごとに別トークン。共通の同一Google Cloudプロジェクト・
+          # OAuthクライアントは使い回すが、リフレッシュトークンはチャンネル単位で別発行。
+          YOUTUBE_OAUTH_REFRESH_TOKEN_CAT: ${{ secrets.YOUTUBE_OAUTH_REFRESH_TOKEN_CAT }}
+          YOUTUBE_OAUTH_REFRESH_TOKEN_DOG: ${{ secrets.YOUTUBE_OAUTH_REFRESH_TOKEN_DOG }}
           TIKTOK_CLIENT_KEY: ${{ secrets.TIKTOK_CLIENT_KEY }}
           TIKTOK_CLIENT_SECRET: ${{ secrets.TIKTOK_CLIENT_SECRET }}
           TIKTOK_ACCESS_TOKEN: ${{ secrets.TIKTOK_ACCESS_TOKEN }}
