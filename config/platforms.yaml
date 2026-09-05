@@ -35,7 +35,7 @@ platforms:
       - TIKTOK_REFRESH_TOKEN
 
   instagram:
-    enabled: false                   # Cat Moments の Instagram 未整備のため保留(Dog は実装・実キー確認済み)
+    enabled: true
     api: "Instagram Graph API (Instagram Login方式) /media + /media_publish + /insights"
     policy_urls:
       - https://developers.facebook.com/docs/instagram-platform
@@ -43,7 +43,7 @@ platforms:
     notes: >-
       動画は一般公開HTTPS URLからの取得方式(video_url)のため、GCSの非公開バケット+
       署名付きURLで一時公開してから投稿する(publishers/instagram.py)。
-      2026-09-05 実キーで投稿・指標取得とも確認済み(Dog Momentsチャンネル)。
+      2026-09-05 Dog Moments・Cat Moments とも実キーで投稿・指標取得を確認済み。
     secret_env:
       - META_APP_ID              # OAuthアプリは共通(全ブランドで同じもの)
       - META_APP_SECRET

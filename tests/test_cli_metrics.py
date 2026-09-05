@@ -28,7 +28,7 @@ def test_metrics_collects_and_writes_performance(published):
     rc = main(["metrics"])
     assert rc == 0
     perf = json.loads((published / "performance.json").read_text(encoding="utf-8"))
-    assert len(perf["records"]) == 6
+    assert len(perf["records"]) == 12  # 6企画 × youtube/instagram の2媒体
     rec = perf["records"][0]
     assert rec["post"]["reality_level"] is not None
     # published_at は今なので latest だけ回収される（24h 未経過）
@@ -40,8 +40,8 @@ def test_metrics_latest_is_upserted_not_duplicated(published):
     main(["metrics"])
     main(["metrics"])
     snaps = json.loads((published / "db" / "snapshots.json").read_text(encoding="utf-8"))
-    # latest は履歴を残さず上書きされるので、2回実行しても 6投稿分のまま
-    assert len(snaps) == 6
+    # latest は履歴を残さず上書きされるので、2回実行しても 12投稿分のまま
+    assert len(snaps) == 12
 
 
 class _FakeAccountPublisher(Publisher):

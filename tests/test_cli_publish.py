@@ -29,7 +29,7 @@ def test_publish_dryrun_publishes_all(generated):
     assert pub["mode"] == "dryrun"
     assert {o["action"] for o in pub["outcomes"]} == {"PUBLISHED"}
     posts = _posts(generated)
-    assert len(posts) == 6
+    assert len(posts) == 12  # 6企画 × youtube/instagram の2媒体
     assert all(p["status"] == "PUBLISHED" and p["platform_post_id"] for p in posts.values())
 
 
@@ -38,7 +38,7 @@ def test_publish_is_idempotent_second_run(generated):
     main(["publish", "--date", "2026-09-02"])
     pub = json.loads((generated / "publish-2026-09-02.json").read_text(encoding="utf-8"))
     assert {o["action"] for o in pub["outcomes"]} == {"ALREADY_PUBLISHED"}
-    assert len(_posts(generated)) == 6  # 増えない
+    assert len(_posts(generated)) == 12  # 増えない
 
 
 def test_publish_splits_generation_cost_across_platforms(tmp_path, monkeypatch):

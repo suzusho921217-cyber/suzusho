@@ -17,7 +17,7 @@ def test_plan_daily_bootstrap_writes_file(tmp_path, capsys):
     assert len(data["plans"]) == 6
     assert {p["brand"] for p in data["plans"]} == {"cat", "dog"}
     assert all(p["experiment_flag"] == "explore" for p in data["plans"])
-    assert all(p["target_platforms"] == ["youtube"] for p in data["plans"])
+    assert all(p["target_platforms"] == ["youtube", "instagram"] for p in data["plans"])
 
     assert "mode=equal" in capsys.readouterr().out
 
