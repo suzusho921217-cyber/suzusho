@@ -100,6 +100,30 @@ def test_upsert_snapshot_replaces_same_post_and_label(tmp_path):
     assert len(snaps) == 1 and snaps[0].views == 20  # 上書きされ、履歴は残らない
 
 
+def test_upsert_snapshot_computes_views_delta(tmp_path):
+    store = LocalStore(tmp_path)
+    store.upsert_snapshot(PerformanceSnapshot(
+        post_key="p1:youtube", snapshot="latest",
+        collected_at=datetime(2026, 9, 2, tzinfo=JST), views=100,
+    ))
+    store.upsert_snapshot(PerformanceSnapshot(
+        post_key="p1:youtube", snapshot="latest",
+        collected_at=datetime(2026, 9, 3, tzinfo=JST), views=140,
+    ))
+    snap = store.list_snapshots(post_key="p1:youtube")[0]
+    assert snap.views == 140 and snap.views_delta == 40
+
+
+def test_upsert_snapshot_leaves_views_delta_none_on_first_record(tmp_path):
+    store = LocalStore(tmp_path)
+    store.upsert_snapshot(PerformanceSnapshot(
+        post_key="p1:youtube", snapshot="latest",
+        collected_at=datetime(2026, 9, 2, tzinfo=JST), views=100,
+    ))
+    snap = store.list_snapshots(post_key="p1:youtube")[0]
+    assert snap.views_delta is None  # 比較対象の前回値が無い
+
+
 def test_upsert_snapshot_keeps_other_labels_separate(tmp_path):
     store = LocalStore(tmp_path)
     store.upsert_snapshot(PerformanceSnapshot(
@@ -320,6 +344,7 @@ def test_sheets_upsert_snapshot_replaces_same_post_and_label():
     assert len(tabs["パフォーマンスDB"]) == 2  # 見出し + データ1行のみ（追記されない）
     snaps = store.list_snapshots(post_key="p1:youtube")
     assert len(snaps) == 1 and snaps[0].views == 20
+    assert snaps[0].views_delta == 10  # 20 - 10
 
 
 def test_sheets_account_daily_upsert_by_composite_key():

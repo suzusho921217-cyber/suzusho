@@ -36,7 +36,7 @@ _EPOCH = datetime(1970, 1, 1, tzinfo=timezone.utc)
 _SNAPSHOT_NUMERIC = (
     "views", "engaged_views", "likes", "comments", "shares", "impressions",
     "avg_watch_sec", "completion_rate", "followers_before", "followers_after",
-    "revenue_jpy",
+    "revenue_jpy", "views_delta",
 )
 
 
@@ -97,6 +97,17 @@ def snapshot_from_row(d: dict) -> PerformanceSnapshot:
         collected_at=_parse_dt(d.get("collected_at")) or _EPOCH,
         **{k: d.get(k) for k in _SNAPSHOT_NUMERIC},
     )
+
+
+def _fill_views_delta(snap: PerformanceSnapshot, old_views) -> None:
+    """upsert_snapshot 用: 上書き前の再生数との差分を snap.views_delta に入れる。
+
+    呼び出し側が明示的に views_delta を渡している場合は上書きしない。
+    """
+    if snap.views_delta is not None:
+        return
+    if snap.views is not None and old_views is not None:
+        snap.views_delta = snap.views - int(old_views)
 
 
 def account_daily_to_row(a: AccountDaily) -> dict:
@@ -207,6 +218,7 @@ class LocalStore(Store):
         data = self._read("snapshots.json", [])
         for i, row in enumerate(data):
             if row.get("post_key") == snap.post_key and row.get("snapshot") == snap.snapshot:
+                _fill_views_delta(snap, row.get("views"))
                 data[i] = snapshot_to_row(snap)
                 self._write("snapshots.json", data)
                 return
@@ -256,12 +268,12 @@ _SNAPSHOT_HEADERS_JA = {
     "comments": "コメント数", "shares": "シェア数", "impressions": "インプレッション数",
     "avg_watch_sec": "平均視聴秒数", "completion_rate": "完視聴率",
     "followers_before": "フォロワー数(投稿前)", "followers_after": "フォロワー数(投稿後)",
-    "revenue_jpy": "収益",
+    "revenue_jpy": "収益", "views_delta": "再生数(前日比)",
 }
 _SNAPSHOT_UNITS = {
     "views": "回", "engaged_views": "回", "likes": "回", "comments": "回", "shares": "回",
     "impressions": "回", "avg_watch_sec": "秒", "followers_before": "人",
-    "followers_after": "人", "revenue_jpy": "円",
+    "followers_after": "人", "revenue_jpy": "円", "views_delta": "回",
 }
 
 _ACCOUNT_HEADERS_JA = {
@@ -539,10 +551,12 @@ class SheetsStore(Store):
             self._TAB_SNAPSHOT, _SNAPSHOT_HEADERS_JA, set(_SNAPSHOT_NUMERIC),
             _SNAPSHOT_VALUE_MAPS, _SNAPSHOT_DT_KEYS, _SNAPSHOT_UNITS,
         )
-        match = next(
-            (i for i, d in rows if d.get("post_key") == snap.post_key and d.get("snapshot") == snap.snapshot),
-            None,
-        )
+        match = None
+        for i, d in rows:
+            if d.get("post_key") == snap.post_key and d.get("snapshot") == snap.snapshot:
+                match = i
+                _fill_views_delta(snap, d.get("views"))
+                break
         self._upsert_row(
             self._TAB_SNAPSHOT, _SNAPSHOT_HEADERS_JA, set(_SNAPSHOT_NUMERIC),
             snapshot_to_row(snap), match_row_number=match,
