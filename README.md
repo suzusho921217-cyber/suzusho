@@ -124,6 +124,24 @@ mock/dryrun のまま
 `daily-learning` の入力 JSON（`.state/performance.json`）は `metrics` が生成する:
 `{"records": [{"post": {...企画タグ + generation_cost_jpy + published_at}, "snapshots": {"latest": {...}}}]}`。
 
+## agent-mtg（毎日のエージェントMTG）
+
+`.claude/agents/{analyst,researcher,marketer,critic,coordinator}.md` の5役職をヘッドレスで
+順番に呼び（analyst→researcher→marketer→critic→coordinator）、coordinatorの結論のうち
+**費用・ポリシーが一切絡まない**提案（企画タグ追加／フック種別追加／ハッシュタグ差し替え）
+だけを `config/planning.yaml` `config/hashtags.yaml` に自動反映してコミットする。
+費用・ポリシーが絡む提案は自動実行せず、メールで報告するのみ（判断はユーザー）。
+
+```bash
+python -m src.cli agent-mtg
+```
+
+- ロジック本体は `src/mtg/`（`roles.py`=各役職のプロンプト、`context.py`=判断材料の収集、
+  `apply.py`=許可された3種類のみ受け付ける安全な反映処理、`orchestrate.py`=全体の流れ）
+- 既定モデルは費用優先で Haiku（`MTG_MODEL` 環境変数で上書き可）
+- GitHub Actions: `.github/workflows/agent_mtg.yml`（毎日 05:37 JST、`daily_learning` の後）
+- 実行には `ANTHROPIC_API_KEY` が必要（`console.anthropic.com` で発行、GitHub Secretsに設定）
+
 ## シークレット（§5）
 
 APIキー・OAuth token・refresh token はコードにも Sheets にも保存しない。

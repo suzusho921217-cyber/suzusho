@@ -1,0 +1,56 @@
+# agent-mtg: analyst→researcher→marketer→critic→coordinatorの5役職を毎日呼び、
+# coordinatorの結論のうち費用・ポリシーが絡まない提案だけconfigに自動反映してコミットする。
+# 費用が絡む提案・ポリシーが絡む提案は自動実行しない（メール報告のみ、ユーザー判断）。
+name: agent_mtg
+on:
+  schedule:
+    - cron: "37 20 * * *"  # 05:37 JST（daily_learning 05:00 JST の後）
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - run: pip install -r requirements.txt
+
+      - name: agent-mtg
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          SHEETS_SPREADSHEET_ID: ${{ secrets.SHEETS_SPREADSHEET_ID }}
+          GOOGLE_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
+          SHEETS_BACKEND: ${{ vars.SHEETS_BACKEND }}
+          GMAIL_SENDER_ADDRESS: ${{ secrets.GMAIL_SENDER_ADDRESS }}
+          GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
+          ALERT_EMAIL_TO: ${{ secrets.ALERT_EMAIL_TO }}
+        run: python -m src.cli agent-mtg
+
+      - name: 状態退避
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: state-agent-mtg-${{ github.run_id }}
+          path: .state/
+          if-no-files-found: ignore
+
+      - name: 自動反映したconfigをコミット
+        run: |
+          if [ -n "$(git status --porcelain config/)" ]; then
+            git config user.name "agent-mtg[bot]"
+            git config user.email "agent-mtg@users.noreply.github.com"
+            git add config/planning.yaml config/hashtags.yaml
+            git commit -m "agent-mtg: 自動反映（費用・ポリシー無関係の企画/ハッシュタグのみ）"
+            git push
+          else
+            echo "変更なし、コミットしない"
+          fi

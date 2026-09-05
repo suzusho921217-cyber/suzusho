@@ -13,6 +13,10 @@ google-auth-oauthlib>=1.2      # YouTube OAuth
 requests>=2.32                 # TikTok / Meta / X REST
 google-cloud-storage>=2.18     # Instagram投稿用: 動画の一時公開(署名付きURL)
 
+# エージェントMTG（agent-mtg。§ 6役職ヘッドレス実行）
+anthropic>=0.40                # Claude API（analyst/researcher/marketer/critic/coordinator）
+ruamel.yaml>=0.18               # config/*.yaml のコメントを保持したまま自動反映
+
 # 開発
 pytest>=8.0
 ruff>=0.6

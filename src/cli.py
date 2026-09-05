@@ -96,6 +96,7 @@ COMMANDS = [
     "metrics",
     "daily-learning",
     "kill-switch",
+    "agent-mtg",
 ]
 
 
@@ -976,6 +977,18 @@ def cmd_kill_switch(args: argparse.Namespace) -> int:
     return 0 if overall.action.value == "ALLOW" else 3
 
 
+def cmd_agent_mtg(args: argparse.Namespace) -> int:
+    """5役職（analyst→researcher→marketer→critic→coordinator）を順番に呼び、
+
+    coordinatorの結論のうち費用・ポリシーが絡まない提案だけ自動でconfigに反映する。
+    結果は `.state/mtg-<date>.json` に保存し、メールで報告する（§ agent-mtg）。
+    """
+    from src.mtg.orchestrate import run_and_report
+
+    result = run_and_report()
+    return 1 if result.error else 0
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="ai-media")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -1016,6 +1029,8 @@ def main(argv: list[str] | None = None) -> int:
         return cmd_publish(args)
     if args.command == "metrics":
         return cmd_metrics(args)
+    if args.command == "agent-mtg":
+        return cmd_agent_mtg(args)
 
     print(f"[cli] command={args.command} — not implemented yet")
     return 0
