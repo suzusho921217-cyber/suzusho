@@ -9,18 +9,30 @@
 cat:
   youtube:
     always: ["#Shorts", "#猫", "#cat", "#cats"]
-    pool: ["#子猫", "#kitten", "#かわいい猫", "#cutecat", "#catsofyoutube", "#catlover",
-           "#ねこ", "#癒し", "#funnycats", "#kittensofyoutube", "#猫のいる暮らし"]
+    pool:
+    - '#猫動画'
+    - '#ペット'
+    - '#癒し'
+    - '#猫'
     per_video: 4
   tiktok:
     always: ["#猫", "#cat", "#catsoftiktok", "#fyp"]
-    pool: ["#子猫", "#kitten", "#かわいい", "#cutecat", "#foryou", "#foryoupage",
-           "#猫好きさんと繋がりたい", "#catlover", "#funnycat", "#kittensoftiktok", "#ねこ"]
+    pool:
+    - '#foryou'
+    - '#猫'
+    - '#ペット'
+    - '#ねこ好きさんと繋がりたい'
+    - '#猫のいる生活'
     per_video: 5
   instagram:
     always: ["#猫", "#cat", "#catstagram", "#catsofinstagram"]
-    pool: ["#ねこすたぐらむ", "#子猫", "#kitten", "#kittensofinstagram", "#にゃんすたぐらむ",
-           "#cutecat", "#catlover", "#猫のいる暮らし", "#instacat", "#ペット", "#癒し"]
+    pool:
+    - '#猫好き'
+    - '#ねこ'
+    - '#猫との生活'
+    - '#ペット'
+    - '#可愛い'
+    - '#シェア推奨'
     per_video: 6
   x:
     always: ["#猫", "#cat"]
@@ -30,18 +42,30 @@ cat:
 dog:
   youtube:
     always: ["#Shorts", "#犬", "#dog", "#dogs"]
-    pool: ["#子犬", "#puppy", "#かわいい犬", "#cutedog", "#dogsofyoutube", "#doglover",
-           "#いぬ", "#柴犬", "#shiba", "#puppiesofyoutube", "#犬のいる暮らし"]
+    pool:
+    - '#犬動画'
+    - '#ペット'
+    - '#癒し'
+    - '#わんこ'
     per_video: 4
   tiktok:
     always: ["#犬", "#dog", "#dogsoftiktok", "#fyp"]
-    pool: ["#子犬", "#puppy", "#かわいい", "#cutedog", "#foryou", "#foryoupage",
-           "#犬好きさんと繋がりたい", "#doglover", "#funnydog", "#puppiesoftiktok", "#柴犬"]
+    pool:
+    - '#foryou'
+    - '#犬'
+    - '#ペット'
+    - '#わんこ'
+    - '#犬のいる生活'
     per_video: 5
   instagram:
     always: ["#犬", "#dog", "#dogstagram", "#dogsofinstagram"]
-    pool: ["#いぬすたぐらむ", "#子犬", "#puppy", "#puppiesofinstagram", "#わんすたぐらむ",
-           "#cutedog", "#doglover", "#犬のいる暮らし", "#instadog", "#ペット", "#柴犬"]
+    pool:
+    - '#犬好き'
+    - '#わんこ'
+    - '#ペット'
+    - '#可愛い'
+    - '#動物'
+    - '#シェア推奨'
     per_video: 6
   x:
     always: ["#犬", "#dog"]
