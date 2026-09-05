@@ -41,6 +41,34 @@ def test_publish_is_idempotent_second_run(generated):
     assert len(_posts(generated)) == 6  # 増えない
 
 
+def test_publish_splits_generation_cost_across_platforms(tmp_path, monkeypatch):
+    # 同じ動画を複数媒体に使い回す場合、生成費は媒体数で均等分割して記録される
+    # （そのまま複製すると合計が実際の支出より水増しされるため）。
+    monkeypatch.setattr("src.cli.STATE_DIR", tmp_path)
+    plan = {
+        "plan_id": "p1", "date": "2026-09-02", "brand": "dog",
+        "concept_tag": "違和感", "hook_type": "0.5秒異常", "character_id": "DOG_001",
+        "reality_level": 4, "oddity_level": 2, "duration_target_sec": 8,
+        "experiment_flag": "explore", "policy_risk": "LOW", "prompt_version": "v1",
+        "prompt_text": None, "target_platforms": ["youtube", "instagram"], "notes": "",
+    }
+    (tmp_path / "plan-2026-09-02.json").write_text(
+        json.dumps({"date": "2026-09-02", "plans": [plan]}), encoding="utf-8"
+    )
+    (tmp_path / "jobs-2026-09-02.json").write_text(json.dumps({
+        "date": "2026-09-02", "provider": "mock",
+        "jobs": [{"job_id": "j1", "plan_id": "p1", "provider": "mock",
+                  "status": "SUCCEEDED", "cost_jpy": 64.0, "local_path": "x.mp4"}],
+        "skipped": [],
+    }), encoding="utf-8")
+
+    rc = main(["publish", "--date", "2026-09-02"])
+    assert rc == 0
+    posts = _posts(tmp_path)
+    assert len(posts) == 2
+    assert all(p["generation_cost_jpy"] == 32.0 for p in posts.values())
+
+
 def test_publish_respects_guard_hold(generated):
     (generated / "guard.json").write_text(json.dumps({
         "targets": [{"brand": "cat", "platform": "youtube", "action": "HOLD",

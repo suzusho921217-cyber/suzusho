@@ -586,6 +586,10 @@ def cmd_publish(args: argparse.Namespace) -> int:
         plan = plans.get(jd.get("plan_id"))
         if plan is None:
             continue
+        # 同じ動画を複数媒体に使い回すため、生成費は媒体数で均等分割して記録する
+        # （そのまま複製すると合計が実際の支出より水増しされる）。
+        n_platforms = len(plan.target_platforms) or 1
+        cost_per_platform = float(jd.get("cost_jpy", 0.0)) / n_platforms
         for platform in plan.target_platforms:
             account_id = f"{plan.brand.value}-{platform.value}"  # TODO: アカウント設定を config 化
             post = Post(
@@ -595,7 +599,7 @@ def cmd_publish(args: argparse.Namespace) -> int:
                 character_id=plan.character_id, duration_sec=plan.duration_target_sec,
                 oddity_level=plan.oddity_level, reality_level=plan.reality_level,
                 prompt_version=plan.prompt_version,
-                generation_cost_jpy=float(jd.get("cost_jpy", 0.0)),
+                generation_cost_jpy=cost_per_platform,
                 policy_version="", policy_result=PolicyDecision.PASS,
                 status=PostStatus.PUBLISHING,
             )
