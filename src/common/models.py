@@ -173,6 +173,7 @@ class PerformanceSnapshot:
     followers_after: int | None = None
     revenue_jpy: float | None = None
     views_delta: int | None = None  # 前回の latest からの再生数の増減（upsert_snapshot が計算）
+    followers_delta: int | None = None  # followers_after - followers_before（分かる時だけ）
 
     # 派生指標（分母が 0/None なら None）
     def rate(self, numerator: int | None) -> float | None:

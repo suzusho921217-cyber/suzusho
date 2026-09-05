@@ -36,7 +36,7 @@ _EPOCH = datetime(1970, 1, 1, tzinfo=timezone.utc)
 _SNAPSHOT_NUMERIC = (
     "views", "engaged_views", "likes", "comments", "shares", "impressions",
     "avg_watch_sec", "completion_rate", "followers_before", "followers_after",
-    "revenue_jpy", "views_delta",
+    "revenue_jpy", "views_delta", "followers_delta",
 )
 
 
@@ -264,16 +264,16 @@ _POST_UNITS = {"duration_sec": "秒", "generation_cost_jpy": "円"}
 
 _SNAPSHOT_HEADERS_JA = {
     "post_key": "投稿キー", "snapshot": "計測時点", "collected_at": "取得日時",
-    "views": "再生数", "engaged_views": "エンゲージ視聴数", "likes": "いいね数",
-    "comments": "コメント数", "shares": "シェア数", "impressions": "インプレッション数",
+    "views": "再生数", "engaged_views": "eng視聴数", "likes": "いいね数",
+    "comments": "コメント数", "shares": "シェア数", "impressions": "IMP数",
     "avg_watch_sec": "平均視聴秒数", "completion_rate": "完視聴率",
-    "followers_before": "フォロワー数(投稿前)", "followers_after": "フォロワー数(投稿後)",
+    "followers_after": "Flwr数", "followers_delta": "Flwr数(前日比)",
     "revenue_jpy": "収益", "views_delta": "再生数(前日比)",
 }
 _SNAPSHOT_UNITS = {
     "views": "回", "engaged_views": "回", "likes": "回", "comments": "回", "shares": "回",
-    "impressions": "回", "avg_watch_sec": "秒", "followers_before": "人",
-    "followers_after": "人", "revenue_jpy": "円", "views_delta": "回",
+    "impressions": "回", "avg_watch_sec": "秒", "followers_after": "人",
+    "followers_delta": "人", "revenue_jpy": "円", "views_delta": "回",
 }
 
 _ACCOUNT_HEADERS_JA = {

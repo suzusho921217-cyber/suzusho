@@ -753,6 +753,8 @@ def cmd_metrics(args: argparse.Namespace) -> int:
                 if snap.followers_before is None:
                     snap.followers_before = followers_before
                 snap.followers_after = current_followers
+                if followers_before is not None:
+                    snap.followers_delta = current_followers - followers_before
             # "latest" は毎回この投稿の現在値を1行で持ちたい（履歴を残さず上書き）。
             # 24h/72h/7d はその時点の記録として一度きり追記する。
             if label == "latest":

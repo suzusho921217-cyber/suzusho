@@ -86,6 +86,7 @@ def test_metrics_tracks_followers_before_and_after(tmp_path, monkeypatch):
     assert len(snaps) == 1
     assert snaps[0].followers_before == 100
     assert snaps[0].followers_after == 120
+    assert snaps[0].followers_delta == 20
 
     today_rows = [a for a in store.list_account_daily() if a.account_id == "dog-youtube"]
     todays = max(today_rows, key=lambda a: a.date)
