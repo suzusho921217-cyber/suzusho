@@ -16,8 +16,10 @@ from __future__ import annotations
 
 import abc
 import json
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
+
+JST = timezone(timedelta(hours=9))
 
 from src.common.config import env
 from src.common.models import (
@@ -86,7 +88,10 @@ def post_from_row(d: dict) -> Post:
 
 def snapshot_to_row(s: PerformanceSnapshot) -> dict:
     row = {"post_key": s.post_key, "snapshot": s.snapshot,
-           "collected_at": s.collected_at.isoformat()}
+           "collected_at": s.collected_at.isoformat(),
+           # 媒体は投稿キー(<master_video_id>:<platform>)から導出する表示用の値。
+           # PerformanceSnapshot 自体はplatformを持たない。
+           "platform": s.post_key.rsplit(":", 1)[-1] if ":" in s.post_key else None}
     row.update({k: getattr(s, k) for k in _SNAPSHOT_NUMERIC})
     return row
 
@@ -284,7 +289,7 @@ _POST_NUMERIC = {"duration_sec", "oddity_level", "reality_level", "generation_co
 _POST_UNITS = {"duration_sec": "秒", "generation_cost_jpy": "円"}
 
 _SNAPSHOT_HEADERS_JA = {
-    "post_key": "投稿キー", "snapshot": "計測時点", "collected_at": "取得日時",
+    "post_key": "投稿キー", "platform": "媒体", "snapshot": "計測時点", "collected_at": "取得日時",
     "views": "再生数", "engaged_views": "eng視聴数", "likes": "いいね数",
     "comments": "コメント数", "shares": "シェア数", "impressions": "IMP数",
     "avg_watch_sec": "平均視聴秒数", "completion_rate": "完視聴率",
@@ -297,7 +302,11 @@ _SNAPSHOT_UNITS = {
     "followers_delta": "人", "revenue_jpy": "円", "views_delta": "回",
 }
 # 単位付き数値のうち、小数の桁数を絞りたいフィールド（見やすさのため）
-_ROUND_DIGITS: dict[str, int] = {"avg_watch_sec": 1}
+_ROUND_DIGITS: dict[str, int] = {
+    "avg_watch_sec": 1,
+    "generation_cost_jpy": 0, "revenue_jpy": 0,
+    "daily_revenue_jpy": 0, "daily_api_cost_jpy": 0,
+}
 
 _ACCOUNT_HEADERS_JA = {
     "date": "日付", "brand": "ブランド", "platform": "媒体", "account_id": "アカウントID",
@@ -332,7 +341,7 @@ _POST_VALUE_MAPS = {
     "brand": _BRAND_JA, "platform": _PLATFORM_JA,
     "policy_result": _POLICY_DECISION_JA, "status": _POST_STATUS_JA,
 }
-_SNAPSHOT_VALUE_MAPS = {"snapshot": _SNAPSHOT_LABEL_JA}
+_SNAPSHOT_VALUE_MAPS = {"snapshot": _SNAPSHOT_LABEL_JA, "platform": _PLATFORM_JA}
 _ACCOUNT_VALUE_MAPS = {"brand": _BRAND_JA, "platform": _PLATFORM_JA, "status": _ACCOUNT_STATUS_JA}
 
 # --- 日時表示: シート上は "26/08/31 12:00"、コード内部は ISO 8601 のまま ------
@@ -347,11 +356,14 @@ def _format_dt_ja(iso_str: str) -> str:
         dt = datetime.fromisoformat(iso_str)
     except (TypeError, ValueError):
         return iso_str
-    # ★タイムゾーンをUTCに正規化してから表示用の数字にする。ここを省くと、
+    # ★タイムゾーンをJSTに正規化してから表示用の数字にする。ここを省くと、
     # 例えばJSTのdatetimeを渡した場合に時刻の数字だけそのままUTC扱いで
     # 読み戻されてしまい、実際の時刻から9時間ずれる（実際に発生したバグ）。
+    # UTCではなくJSTに揃えるのは、シート上の表示を日本時間で読めるようにするため
+    # （書き込み・読み戻しの両方でJSTに統一していれば、この変換自体はどちらでも
+    # ズレは起きない。人が読む画面なのでJSTを選んでいる）。
     if dt.tzinfo is not None:
-        dt = dt.astimezone(timezone.utc)
+        dt = dt.astimezone(JST)
     return dt.strftime(_DT_DISPLAY_FMT)
 
 
@@ -361,7 +373,7 @@ def _parse_dt_ja(display_str: str) -> str:
     旧形式(ISO文字列がそのまま残っている行)にも後方互換で対応。
     """
     try:
-        return datetime.strptime(display_str, _DT_DISPLAY_FMT).replace(tzinfo=timezone.utc).isoformat()
+        return datetime.strptime(display_str, _DT_DISPLAY_FMT).replace(tzinfo=JST).isoformat()
     except (TypeError, ValueError):
         pass
     try:
@@ -431,6 +443,24 @@ class SheetsStore(Store):
         ).execute()
         return res.get("values", [])
 
+    @staticmethod
+    def _find_header_row(
+        raw: list[list[str]], headers_ja: dict[str, str],
+    ) -> int | None:
+        """見出し行の実行番号(1始まり)を探す。常に1行目とは決め打たない。
+
+        シート上部に集計欄などを挿入されても壊れないよう、headers_ja の最初の
+        フィールド（例: 投稿キー）のラベルがどこかのセルに現れる最初の行を見出し行とみなす。
+        列の並び替えには元々強い設計なので、行の中でどの位置にあっても検出できる。
+        """
+        anchor = next(iter(headers_ja.values()), None)
+        if anchor is None:
+            return None
+        for i, row in enumerate(raw, start=1):
+            if anchor in row:
+                return i
+        return None
+
     def _rows_with_index(
         self, tab: str, headers_ja: dict[str, str], numeric_keys: set[str],
         value_maps: dict[str, dict[str, str]] | None = None,
@@ -449,13 +479,14 @@ class SheetsStore(Store):
         units = units or {}
         reverse_maps = {k: {v: ek for ek, v in m.items()} for k, m in value_maps.items()}
         raw = self._fetch_raw(tab)
-        if not raw:
+        header_idx = self._find_header_row(raw, headers_ja)
+        if header_idx is None:
             return [], []
-        header_row = raw[0]
+        header_row = raw[header_idx - 1]
         ja_to_key = {v: k for k, v in headers_ja.items()}
         col_keys = [ja_to_key.get(h) for h in header_row]
         out = []
-        for i, r in enumerate(raw[1:], start=2):  # 1行目=見出しなのでデータは2行目から
+        for i, r in enumerate(raw[header_idx:], start=header_idx + 1):  # 見出し行の次から
             d: dict = {}
             for idx, key in enumerate(col_keys):
                 if key is None:
@@ -499,7 +530,10 @@ class SheetsStore(Store):
             elif v is not None and key in units and isinstance(v, (int, float)):
                 num = int(v) if isinstance(v, float) and v.is_integer() else v
                 if isinstance(num, float) and key in _ROUND_DIGITS:
-                    num = round(num, _ROUND_DIGITS[key])
+                    digits = _ROUND_DIGITS[key]
+                    num = round(num, digits)
+                    if digits == 0:
+                        num = int(num)
                 v = f"{num:,}{units[key]}"
             values.append("" if v is None else v)
         return values
@@ -511,16 +545,19 @@ class SheetsStore(Store):
         dt_keys: set[str] | None = None,
         units: dict[str, str] | None = None,
     ) -> None:
-        header_row, _ = self._rows_with_index(tab, headers_ja, numeric_keys, value_maps, dt_keys, units)
-        if not header_row:
-            header_row = list(headers_ja.values())
+        raw = self._fetch_raw(tab)
+        header_idx = self._find_header_row(raw, headers_ja)
+        header_row = raw[header_idx - 1] if header_idx else list(headers_ja.values())
         values = self._values_for_header(header_row, headers_ja, row, value_maps, dt_keys, units)
         svc = self._svc().spreadsheets().values()
         if match_row_number is None:
             # OVERWRITE: 新規行を挿入せず既存の空セルに書くだけにする。
             # INSERT_ROWS だと挿入した行が直上（見出し行）の書式を引き継いでしまう。
+            # range は見出し行から下に絞る（見出しより上に集計欄等があっても、
+            # そちらを「表」として誤検出して追記されないようにするため）。
+            append_range = f"{tab}!A{header_idx}:Z" if header_idx else tab
             svc.append(
-                spreadsheetId=self.spreadsheet_id, range=tab,
+                spreadsheetId=self.spreadsheet_id, range=append_range,
                 valueInputOption="RAW", insertDataOption="OVERWRITE",
                 body={"values": [values]},
             ).execute()

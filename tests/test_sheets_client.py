@@ -28,7 +28,7 @@ from src.sheets.client import (
     get_store,
 )
 
-JST = timezone.utc
+JST = timezone(timedelta(hours=9))
 
 
 def _post(key="p1:youtube", **over):
@@ -224,6 +224,23 @@ _SNAPSHOT_HEADER_JA = list(SNAPSHOT_HEADERS_JA.values())
 _ACCOUNT_HEADER_JA = list(ACCOUNT_HEADERS_JA.values())
 
 
+def test_sheets_header_row_found_even_with_summary_block_above():
+    # ユーザーがシート上部に集計欄を挿入しても、見出し行(投稿キー列を含む行)を
+    # 動的に探して壊れないことを確認する。
+    tabs = {"投稿DB": [
+        ["ブランド", "媒体", "集計"],
+        ["猫", "YouTube", "1"],
+        [],
+        _POST_HEADER_JA,
+    ]}
+    store = _fake_store(tabs)
+    store.upsert_post(_post())
+    got = store.get_post("p1:youtube")
+    assert got == _post()
+    # 集計欄(1〜3行目)はそのまま残っている
+    assert tabs["投稿DB"][0] == ["ブランド", "媒体", "集計"]
+
+
 def test_sheets_upsert_post_appends_when_missing():
     tabs = {"投稿DB": [_POST_HEADER_JA]}
     store = _fake_store(tabs)
@@ -260,6 +277,14 @@ def test_sheets_units_are_embedded_in_the_data_not_the_header():
     assert got.duration_sec == 10 and got.generation_cost_jpy == 120.0
 
 
+def test_sheets_generation_cost_rounded_to_whole_yen():
+    tabs = {"投稿DB": [_POST_HEADER_JA]}
+    store = _fake_store(tabs)
+    store.upsert_post(_post(generation_cost_jpy=237.11))
+    written = dict(zip(_POST_HEADER_JA, tabs["投稿DB"][1]))
+    assert written["生成費"] == "237円"
+
+
 def test_sheets_snapshot_units_roundtrip():
     tabs = {"パフォーマンスDB": [_SNAPSHOT_HEADER_JA]}
     store = _fake_store(tabs)
@@ -284,17 +309,18 @@ def test_sheets_datetime_displayed_as_short_ja_format():
     assert store.get_post("p1:youtube").published_at == datetime(2026, 8, 31, 12, 0, tzinfo=JST)
 
 
-def test_sheets_datetime_normalizes_non_utc_timezone_to_utc():
+def test_sheets_datetime_normalizes_non_jst_timezone_to_jst():
     # 実際に発生したバグ: JST等UTC以外のtzで保存すると、時刻の数字がそのまま
-    # UTC扱いで読み戻され、実時刻から9時間ずれていた。
+    # 別タイムゾーン扱いで読み戻され、実時刻からズレていた。表示はJSTに統一する
+    # （シートを読むのは日本のユーザーなので）。
     tabs = {"投稿DB": [_POST_HEADER_JA]}
     store = _fake_store(tabs)
-    actual_jst = timezone(timedelta(hours=9))
-    store.upsert_post(_post(published_at=datetime(2026, 8, 31, 21, 0, tzinfo=actual_jst)))
+    utc = timezone.utc
+    store.upsert_post(_post(published_at=datetime(2026, 8, 31, 3, 0, tzinfo=utc)))
     written = dict(zip(_POST_HEADER_JA, tabs["投稿DB"][1]))
-    assert written["投稿日時"] == "26/08/31 12:00"  # 21:00 JST = 12:00 UTC
+    assert written["投稿日時"] == "26/08/31 12:00"  # 03:00 UTC = 12:00 JST
     got = store.get_post("p1:youtube").published_at
-    assert got == datetime(2026, 8, 31, 21, 0, tzinfo=actual_jst)  # 同じ瞬間として一致
+    assert got == datetime(2026, 8, 31, 3, 0, tzinfo=utc)  # 同じ瞬間として一致
 
 
 def test_sheets_upsert_post_updates_existing_row_in_place():
