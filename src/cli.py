@@ -46,6 +46,7 @@ from src.common.guardrails import (
     check_kill_switch,
     combine,
 )
+from src.common.notify import send_alert_email
 from src.common.models import (
     Brand,
     ContentPlan,
@@ -399,6 +400,12 @@ def cmd_generate(args: argparse.Namespace) -> int:
     for s in skipped:
         print(f"  ! {s['plan_id']}: {s['reason']}")
     print(f"[generate] wrote {out}")
+
+    if skipped:
+        lines = [f"date={date} 投入={len(jobs)} スキップ={len(skipped)}"]
+        lines += [f"  - {s['plan_id']}: {s['reason']}" for s in skipped]
+        send_alert_email("[AI動画自動投稿] 予算ゲートで生成をスキップ", "\n".join(lines))
+
     return 0
 
 
@@ -851,6 +858,21 @@ def cmd_kill_switch(args: argparse.Namespace) -> int:
         for r in row["reasons"]:
             print(f"      - {r}")
     print(f"[kill-switch] wrote {out}")
+
+    if overall.action.value != "ALLOW":
+        lines = [f"overall={overall.action.value}"]
+        if budget_verdict.blocked:
+            lines.append("予算: " + budget_verdict.action.value)
+            lines += [f"  - {r}" for r in budget_verdict.triggers]
+        for row in target_rows:
+            if row["action"] != "ALLOW":
+                lines.append(f"{row['brand']}×{row['platform']}: {row['action']}")
+                lines += [f"  - {r}" for r in row["reasons"]]
+        send_alert_email(
+            f"[AI動画自動投稿] kill-switch作動: {overall.action.value}",
+            "\n".join(lines),
+        )
+
     return 0 if overall.action.value == "ALLOW" else 3
 
 

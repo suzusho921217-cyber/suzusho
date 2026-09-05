@@ -321,34 +321,49 @@ class SheetsStore(Store):
     （コード内部では引き続き Enum.value の英語文字列として扱い、シートI/Oの境界だけで
     _*_VALUE_MAPS を介して相互変換する）。
 
-    認証: サービスアカウントの JSON 鍵（env ``GOOGLE_SHEETS_CREDENTIALS_FILE``）。
-    対象シート: env ``SHEETS_SPREADSHEET_ID``。
+    認証: サービスアカウントの JSON 鍵。ローカルはファイルパス（env
+    ``GOOGLE_SHEETS_CREDENTIALS_FILE``）、GitHub Actions は Secret の JSON 文字列そのもの
+    （env ``GOOGLE_SERVICE_ACCOUNT_JSON``。ファイルとして置けないため）。両方あれば
+    JSON 文字列を優先する。対象シート: env ``SHEETS_SPREADSHEET_ID``。
     """
 
     _TAB_POST = "投稿DB"
     _TAB_SNAPSHOT = "パフォーマンスDB"
     _TAB_ACCOUNT = "アカウント日次DB"
 
-    def __init__(self, spreadsheet_id: str | None = None, credentials_file: str | None = None) -> None:
+    def __init__(
+        self, spreadsheet_id: str | None = None,
+        credentials_file: str | None = None,
+        credentials_json: str | None = None,
+    ) -> None:
         self.spreadsheet_id = spreadsheet_id or env("SHEETS_SPREADSHEET_ID")
         self.credentials_file = credentials_file or env("GOOGLE_SHEETS_CREDENTIALS_FILE")
+        self.credentials_json = credentials_json or env("GOOGLE_SERVICE_ACCOUNT_JSON")
         self._service = None
 
     # --- 内部: Sheets API ---------------------------------------------------
 
     def _svc(self):
         if self._service is None:
+            import json as _json
+
             from google.oauth2 import service_account
             from googleapiclient.discovery import build
 
             if not self.spreadsheet_id:
                 raise RuntimeError("SHEETS_SPREADSHEET_ID が未設定")
-            if not self.credentials_file:
-                raise RuntimeError("GOOGLE_SHEETS_CREDENTIALS_FILE が未設定")
-            creds = service_account.Credentials.from_service_account_file(
-                self.credentials_file,
-                scopes=["https://www.googleapis.com/auth/spreadsheets"],
-            )
+            scopes = ["https://www.googleapis.com/auth/spreadsheets"]
+            if self.credentials_json:
+                info = _json.loads(self.credentials_json)
+                creds = service_account.Credentials.from_service_account_info(info, scopes=scopes)
+            elif self.credentials_file:
+                creds = service_account.Credentials.from_service_account_file(
+                    self.credentials_file, scopes=scopes,
+                )
+            else:
+                raise RuntimeError(
+                    "GOOGLE_SERVICE_ACCOUNT_JSON / GOOGLE_SHEETS_CREDENTIALS_FILE がどちらも未設定"
+                )
             self._service = build("sheets", "v4", credentials=creds)
         return self._service
 
