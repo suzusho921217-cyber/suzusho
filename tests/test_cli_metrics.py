@@ -93,6 +93,38 @@ def test_metrics_tracks_followers_before_and_after(tmp_path, monkeypatch):
     assert todays.followers == 120
 
 
+def test_metrics_aggregates_daily_account_stats(tmp_path, monkeypatch):
+    monkeypatch.setattr(cli_module, "STATE_DIR", tmp_path)
+    monkeypatch.setattr(cli_module, "get_publisher", lambda platform, brand=None: _FakeAccountPublisher())
+
+    today = datetime.now(timezone.utc)
+    store = LocalStore(tmp_path / "db")
+    for i in range(2):
+        store.upsert_post(Post(
+            post_key=f"p{i}:youtube", master_video_id=f"p{i}", brand=Brand.DOG,
+            platform=Platform.YOUTUBE, account_id="dog-youtube", concept_tag="c",
+            hook_type="h", character_id="DOG_001", duration_sec=8, oddity_level=1,
+            prompt_version="v1", generation_cost_jpy=32.0, policy_version="v1",
+            policy_result=PolicyDecision.PASS, status=PostStatus.PUBLISHED,
+            published_at=today, platform_post_id=f"yt-{i}",
+        ))
+    (tmp_path / "guard.json").write_text(json.dumps({
+        "targets": [{"brand": "dog", "platform": "youtube", "action": "HOLD",
+                     "reasons": ["媒体警告が連続"]}],
+    }), encoding="utf-8")
+
+    rc = main(["metrics"])
+    assert rc == 0
+
+    rows = [a for a in store.list_account_daily() if a.account_id == "dog-youtube"]
+    row = max(rows, key=lambda a: a.date)
+    assert row.daily_posts == 2
+    assert row.daily_views == 1000  # 500 views × 2投稿
+    assert row.daily_api_cost_jpy == 64.0  # 32円 × 2投稿
+    assert row.warnings == 1
+    assert row.status == "HOLD"
+
+
 def test_full_loop_metrics_to_performance_mode_plan(published):
     main(["metrics"])
     main(["daily-learning"])  # 既定入力 = .state/performance.json

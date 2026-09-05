@@ -763,23 +763,54 @@ def cmd_metrics(args: argparse.Namespace) -> int:
                 store.append_snapshot(snap)
             collected += 1
 
-    # 今回取得できたフォロワー数を当日分としてアカウント日次DBに反映（既存フィールドは維持）
-    for (platform_value, brand_value), followers in followers_cache.items():
-        if followers is None:
-            continue
-        posts_for_account = [
-            p for p in posts
-            if p.platform.value == platform_value and p.brand.value == brand_value
-        ]
-        if not posts_for_account:
-            continue
-        account_id = posts_for_account[0].account_id
+    # アカウント日次DBに当日分の実績を反映（既存の他フィールドは維持）:
+    # フォロワー数(今回取得できていれば)・当日投稿数・当日再生数・当日収益・
+    # 当日API費用(生成費)・guard.jsonから見た警告件数とステータス。
+    guard_map = _guard_map()
+    by_account: dict[str, list[Post]] = {}
+    for p in posts:
+        by_account.setdefault(p.account_id, []).append(p)
+
+    for account_id, account_posts in by_account.items():
+        sample = account_posts[0]
+        brand_value, platform_value = sample.brand.value, sample.platform.value
         key = f"{today}|{account_id}"
         row = account_daily_index.get(key) or AccountDaily(
-            date=today, brand=Brand(brand_value), platform=Platform(platform_value),
+            date=today, brand=sample.brand, platform=sample.platform,
             account_id=account_id,
         )
-        row.followers = followers
+        followers = followers_cache.get((platform_value, brand_value))
+        if followers is not None:
+            row.followers = followers
+
+        today_posts = [
+            p for p in account_posts
+            if p.published_at and p.published_at.date().isoformat() == today
+        ]
+        row.daily_posts = len(today_posts)
+        daily_views = 0
+        daily_revenue = 0.0
+        for p in today_posts:
+            latest = next(
+                (s for s in store.list_snapshots(post_key=p.post_key) if s.snapshot == "latest"),
+                None,
+            )
+            if latest:
+                daily_views += latest.views or 0
+                daily_revenue += latest.revenue_jpy or 0.0
+        row.daily_views = daily_views
+        row.daily_revenue_jpy = round(daily_revenue, 2)
+        row.daily_api_cost_jpy = round(sum(p.generation_cost_jpy for p in today_posts), 2)
+
+        guard = guard_map.get((brand_value, platform_value))
+        row.warnings = len(guard.triggers) if guard else 0
+        if guard is None or guard.action == GuardAction.ALLOW:
+            row.status = "ACTIVE"
+        elif guard.action == GuardAction.STOP:
+            row.status = "STOP"
+        else:
+            row.status = "HOLD"
+
         store.upsert_account_daily(row)
 
     n_records = _write_performance_json(store)
