@@ -116,12 +116,22 @@ class YouTubePublisher(Publisher):
         except (HttpError, GoogleAuthError) as e:
             print(f"[youtube] videos.list 失敗: {e}")
 
+        # ★2026-09-05 実API確認: estimatedRevenue（要収益化+yt-analytics-monetary.readonly）
+        # を他の指標と同じリクエストに混ぜると、その1指標のせいでリクエスト全体が
+        # 401になり engagedViews 等の取れるはずの指標まで巻き添えで失敗していた。
+        # 収益は別リクエストに分離し、非収益指標が失敗を道連れにしないようにする。
         try:
-            metrics.update(self._fetch_analytics(platform_post_id))
+            metrics.update(self._fetch_analytics(
+                platform_post_id, "engagedViews,averageViewDuration,shares,subscribersGained",
+            ))
         except (HttpError, GoogleAuthError) as e:
-            # 未監査/未収益化チャンネルでは engagedViews 等が取れないことがある。
-            # 基本指標（上）だけで処理を続ける。
-            print(f"[youtube] Analytics 取得失敗（基本指標のみで継続）: {e}")
+            print(f"[youtube] Analytics(非収益指標) 取得失敗（基本指標のみで継続）: {e}")
+
+        try:
+            metrics.update(self._fetch_analytics(platform_post_id, "estimatedRevenue"))
+        except (HttpError, GoogleAuthError) as e:
+            # 未収益化チャンネルでは estimatedRevenue だけ取れない（想定内）。
+            print(f"[youtube] 収益取得失敗（未収益化の可能性、他指標には影響なし）: {e}")
         return metrics
 
     def fetch_account_followers(self) -> int | None:
@@ -138,7 +148,7 @@ class YouTubePublisher(Publisher):
             print(f"[youtube] channels.list(mine=True) 失敗: {e}")
         return None
 
-    def _fetch_analytics(self, platform_post_id: str) -> dict:
+    def _fetch_analytics(self, platform_post_id: str, metrics: str) -> dict:
         from datetime import datetime, timedelta, timezone
 
         end = datetime.now(timezone.utc).date()
@@ -147,7 +157,7 @@ class YouTubePublisher(Publisher):
             ids="channel==MINE",
             startDate=start.isoformat(),
             endDate=end.isoformat(),
-            metrics="engagedViews,averageViewDuration,shares,subscribersGained,estimatedRevenue",
+            metrics=metrics,
             filters=f"video=={platform_post_id}",
         ).execute()
         rows = resp.get("rows") or []

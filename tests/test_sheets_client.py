@@ -347,6 +347,31 @@ def test_sheets_upsert_snapshot_replaces_same_post_and_label():
     assert snaps[0].views_delta == 10  # 20 - 10
 
 
+def test_sheets_instagram_engaged_views_shown_as_na_marker():
+    tabs = {"パフォーマンスDB": [_SNAPSHOT_HEADER_JA]}
+    store = _fake_store(tabs)
+    store.upsert_snapshot(PerformanceSnapshot(
+        post_key="p1:instagram", snapshot="latest",
+        collected_at=datetime(2026, 9, 2, tzinfo=JST), views=10, engaged_views=None,
+    ))
+    written = dict(zip(_SNAPSHOT_HEADER_JA, tabs["パフォーマンスDB"][1]))
+    assert written["eng視聴数"] == "-"  # Instagramには概念自体が無いことを明示
+    # 読み込み側ではコード内部は None に戻る(文字列"-"のまま出てこない)
+    assert store.list_snapshots(post_key="p1:instagram")[0].engaged_views is None
+
+
+def test_sheets_youtube_engaged_views_stays_blank_when_missing():
+    tabs = {"パフォーマンスDB": [_SNAPSHOT_HEADER_JA]}
+    store = _fake_store(tabs)
+    store.upsert_snapshot(PerformanceSnapshot(
+        post_key="p1:youtube", snapshot="latest",
+        collected_at=datetime(2026, 9, 2, tzinfo=JST), views=10, engaged_views=None,
+    ))
+    written = dict(zip(_SNAPSHOT_HEADER_JA, tabs["パフォーマンスDB"][1]))
+    # YouTubeでは「今回たまたま取れなかった」可能性があるので "-" にはしない(空欄のまま)
+    assert written["eng視聴数"] == ""
+
+
 def test_sheets_account_daily_upsert_by_composite_key():
     tabs = {"アカウント日次DB": [_ACCOUNT_HEADER_JA]}
     store = _fake_store(tabs)

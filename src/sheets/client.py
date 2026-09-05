@@ -110,6 +110,21 @@ def _fill_views_delta(snap: PerformanceSnapshot, old_views) -> None:
         snap.views_delta = snap.views - int(old_views)
 
 
+# 「概念自体が無い」ことを空欄と区別して人向けに示す印。
+# key: この値がNoneの時に "-" を書くフィールド -> post_key の末尾(:platform)で判定する媒体
+_SNAPSHOT_NA_MARKERS: dict[str, str] = {
+    "engaged_views": "instagram",  # Instagramにはエンゲージ視聴数に相当する指標が無い
+}
+
+
+def _snapshot_row_with_na_markers(row: dict) -> dict:
+    platform = row.get("post_key", "").rsplit(":", 1)[-1]
+    for field, target_platform in _SNAPSHOT_NA_MARKERS.items():
+        if platform == target_platform and row.get(field) is None:
+            row[field] = "-"
+    return row
+
+
 def account_daily_to_row(a: AccountDaily) -> dict:
     return {
         "date": a.date, "brand": a.brand.value, "platform": a.platform.value,
@@ -438,7 +453,9 @@ class SheetsStore(Store):
                 if key is None:
                     continue
                 val = r[idx] if idx < len(r) else ""
-                if val == "":
+                if val in ("", "-"):
+                    # "-" は「この媒体では概念自体が無い」ことを人向けに示す表示用の印。
+                    # コード内部では空欄と同じ扱い（None）にする。
                     val = None
                 elif key in dt_keys:
                     val = _parse_dt_ja(val)
@@ -471,7 +488,7 @@ class SheetsStore(Store):
                 v = _format_dt_ja(v)
             elif v is not None and key in value_maps:
                 v = value_maps[key].get(v, v)
-            elif v is not None and key in units:
+            elif v is not None and key in units and isinstance(v, (int, float)):
                 num = int(v) if isinstance(v, float) and v.is_integer() else v
                 v = f"{num:,}{units[key]}"
             values.append("" if v is None else v)
@@ -542,7 +559,7 @@ class SheetsStore(Store):
     def append_snapshot(self, snap: PerformanceSnapshot) -> None:
         self._upsert_row(
             self._TAB_SNAPSHOT, _SNAPSHOT_HEADERS_JA, set(_SNAPSHOT_NUMERIC),
-            snapshot_to_row(snap), match_row_number=None,
+            _snapshot_row_with_na_markers(snapshot_to_row(snap)), match_row_number=None,
             value_maps=_SNAPSHOT_VALUE_MAPS, dt_keys=_SNAPSHOT_DT_KEYS, units=_SNAPSHOT_UNITS,
         )
 
@@ -559,7 +576,7 @@ class SheetsStore(Store):
                 break
         self._upsert_row(
             self._TAB_SNAPSHOT, _SNAPSHOT_HEADERS_JA, set(_SNAPSHOT_NUMERIC),
-            snapshot_to_row(snap), match_row_number=match,
+            _snapshot_row_with_na_markers(snapshot_to_row(snap)), match_row_number=match,
             value_maps=_SNAPSHOT_VALUE_MAPS, dt_keys=_SNAPSHOT_DT_KEYS, units=_SNAPSHOT_UNITS,
         )
 

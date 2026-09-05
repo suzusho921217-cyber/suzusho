@@ -253,6 +253,36 @@ def test_fetch_metrics_degrades_to_basic_stats_when_analytics_fails(monkeypatch)
     assert metrics == {"views": 10}
 
 
+def test_fetch_metrics_revenue_failure_does_not_block_other_analytics(monkeypatch):
+    # ★2026-09-05 実API確認: estimatedRevenue（未収益化チャンネルでは403/401になる）を
+    # 他の指標と同じリクエストに混ぜると、その1指標のせいでengagedViews等まで
+    # 巻き添えで失敗していた。収益だけ別リクエストに分離して他へ影響しないことを確認する。
+    videos = _FakeVideosResource(list_result={"items": [{"statistics": {"viewCount": "10"}}]})
+    pub = YouTubePublisher()
+
+    err = HttpError(resp=type("R", (), {"status": 403, "reason": "Forbidden"})(), content=b"not monetized")
+
+    class _PartlyFailingReports:
+        def query(self, *, metrics, **kwargs):
+            if metrics == "estimatedRevenue":
+                return _FakeExecutable(error=err)
+            return _FakeExecutable({
+                "columnHeaders": [{"name": "engagedViews"}],
+                "rows": [[800]],
+            })
+
+    class _PartlyFailingAnalytics:
+        def reports(self):
+            return _PartlyFailingReports()
+
+    _wire(monkeypatch, pub, youtube=_FakeYouTube(videos=videos), analytics=_PartlyFailingAnalytics())
+
+    metrics = pub.fetch_metrics("yt-123")
+    assert metrics["views"] == 10
+    assert metrics["engagedViews"] == 800
+    assert "estimatedRevenue" not in metrics
+
+
 # --- fetch_account_followers ------------------------------------------------
 
 def test_fetch_account_followers_returns_subscriber_count(monkeypatch):
