@@ -1,0 +1,78 @@
+# 収益化プログラム参照（経営企画エージェント / strategy-review の入力）
+#
+# 各媒体の収益化条件・動画以外の収益経路・「現在の役割」をまとめる。
+# ポリシーや収益化条件は変わる。strategist は毎週 Web 検索で version より新しい
+# 情報が無いか確認し、差分があれば needs_user_approval か weekly_note で知らせる。
+#
+# ここは非機密の運用パラメータのみ（シークレットは書かない / §5）。
+
+version: "2026-09-06"      # この内容を最後に確認した日
+fx_usd_jpy: 150
+
+platforms:
+  youtube:
+    role: 収益化狙い          # 収益化狙い / 露出のみ / 案件用
+    accounts: [Dog Moments, Cat Moments]
+    programs:
+      early_access:
+        name: YPP早期アクセス
+        requires: "登録者500人 ＋ 公開3本 ＋ 直近90日で3,000視聴時間 または 300万ショート視聴"
+        unlocks: "メンバーシップ / Super Thanks / Shopping（広告収益はまだ無し）"
+      ad_revenue:
+        name: YPP本収益化（広告）
+        requires: "登録者1,000人 ＋ 直近12ヶ月4,000視聴時間 または 直近90日で1,000万ショート視聴"
+        unlocks: "広告収益"
+        deadline_change: "2027-02-01 から新規申請は 8,000視聴時間 / 2,000万ショート視聴 に引き上げ（前倒し申請の価値あり）"
+    ai_content_note: "独自の視点が無い汎用テンプレのAI量産は収益化不可（チャンネル単位で剥奪）。AI開示必須・2026年1月から本格執行。"
+    source: "https://support.google.com/youtube/answer/72851 / answer/1311392 / answer/14328491"
+
+  tiktok:
+    role: 露出のみ            # 開設時点。フォーマット判断が出たら見直す
+    accounts: []
+    programs:
+      creator_rewards:
+        name: Creator Rewards Program（旧 Creativity Program）
+        requires: "フォロワー1万人 ＋ 直近30日で10万再生 ＋ 18歳以上 ＋ 個人アカウント ＋ 対象国（日本は対象）"
+        payout: "1,000 qualified views あたり $0.40〜1"
+        constraint: "60秒以上のオリジナル動画のみ対象。1本1,000再生に達して初めて課金対象。"
+    ai_content_note: "オリジナリティの低い量産AIは Creator Rewards から除外＋レコメンド抑制。AIGCラベル必須（未表示は削除・アカウントストライク）。"
+    format_gap: "現行企画は8〜15秒（config/planning.yaml）。Creator Rewards は60秒以上のみ → 現フォーマットのままでは直接収益化の対象外。当面は露出・フォロワー母数・学習データの獲得が目的。"
+    source: "https://www.tiktok.com/creator-academy/article/eligibility"
+
+  instagram:
+    role: 露出のみ
+    accounts: [Dog Moments, Cat Moments]
+    programs:
+      bonus:
+        name: ボーナス（招待制）
+        requires: "招待制。プロアカウント ＋ フォロワー1,000人 ＋ 18歳以上。日本でも年末ボーナス等の実績あり。"
+        note: "狙って取れるものではない。Reels の広告分配（自己申込型）は日本は対象外。"
+    ai_content_note: "フォトリアルなAI動画は自己開示（AI Info ラベル）が必要。"
+    source: "https://about.fb.com/news/2023/11/giving-creators-more-ways-to-earn-money-on-facebook-and-instagram/"
+
+  x:
+    role: 未開設
+    accounts: []
+    programs:
+      creator_ads_revenue_sharing:
+        name: Creator Ads Revenue Sharing / Subscriptions
+        requires: "X Premium 加入 ＋ 直近3ヶ月で500万インプレッション ＋ フォロワー500人（変動しうる）"
+        note: "pay-per-use の API コストと釣り合うか要判断。adult ブランドの受け皿としてのみ検討対象（platform_policies.md）。"
+
+# 動画再生以外の収益経路。strategist が「今のフォロワー規模で狙えるか」を評価する材料。
+off_platform:
+  - name: 案件 / タイアップ（PR投稿）
+    threshold: "フォロワー1万〜（ニッチが明確なら5,000〜）で DM 営業が現実的になる"
+    note: >-
+      AI生成であることの開示 ＋ ステマ規制（景表法, 2023-10〜）に注意。
+      動物系は商材が限られる（ペット用品・ペット保険・ペットフード・動物病院）。
+      複数ブランド（cat/dog）を束ねた「ペット系ネットワーク」として売る手もある。
+  - name: アフィリエイト
+    threshold: "フォロワー規模より遷移導線（プロフィールリンク・固定コメント・概要欄）が要"
+    note: "Amazonアソシエイト / 楽天 / ペット系ASP。動物系はペット用品と相性が良い。"
+  - name: 自社サービスへの送客
+    threshold: "規模不問。送り先の LP とリンク導線が要る"
+    note: "フルウィルの既存事業と繋がる出口があるかは要検討（strategist が指摘）。"
+  - name: グッズ / 素材ライセンス
+    threshold: "熱量の高いファン基盤（数万〜）"
+    note: "AI生成物の著作権・商用利用可否を生成プロバイダ（Veo 等）の規約で要確認。"

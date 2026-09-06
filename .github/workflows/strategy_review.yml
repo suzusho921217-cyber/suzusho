@@ -1,0 +1,67 @@
+# strategy-review: 経営企画役を週1で呼び、各媒体の収益化ラインまでの距離・到達見込み・
+# リソース配分・動画以外の収益経路・継続/撤退シグナルをまとめる。
+# docs/monetization_roadmap.md の週次所見欄を更新してコミットし、メールで報告する。
+# config・コード・予算は変更しない（読み取り＋所見のみ）。
+name: strategy_review
+on:
+  schedule:
+    - cron: "20 21 * * 0"  # 毎週月曜 06:20 JST（日曜 21:20 UTC）
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+# 各媒体の現在地を管理DB/.state から読むので、パイプラインと同じ直列グループに入れる。
+concurrency:
+  group: sns-pipeline-state
+  cancel-in-progress: false
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - run: pip install -r requirements.txt
+
+      - name: strategy-review
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          MTG_MODEL: claude-sonnet-5   # 週1なので費用より判断の質を優先（日次MTGはHaikuのまま）
+          SHEETS_SPREADSHEET_ID: ${{ secrets.SHEETS_SPREADSHEET_ID }}
+          GOOGLE_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
+          SHEETS_BACKEND: ${{ vars.SHEETS_BACKEND }}
+          GMAIL_SENDER_ADDRESS: ${{ secrets.GMAIL_SENDER_ADDRESS }}
+          GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
+          ALERT_EMAIL_TO: ${{ secrets.ALERT_EMAIL_TO }}
+          # 共有 .state/ を読み書き（各媒体の現在地を読む / strategy-<date>.json を残す）
+          STATE_SYNC: "1"
+          GCS_BUCKET_NAME: ${{ secrets.GCS_BUCKET_NAME }}
+          GOOGLE_CLOUD_PROJECT: ${{ secrets.GOOGLE_CLOUD_PROJECT }}
+        run: python -m src.cli strategy-review
+
+      - name: 状態退避
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: state-strategy-review-${{ github.run_id }}
+          path: .state/
+          if-no-files-found: ignore
+
+      - name: 週次所見の更新をコミット
+        run: |
+          if [ -n "$(git status --porcelain docs/monetization_roadmap.md)" ]; then
+            git config user.name "strategy-review[bot]"
+            git config user.email "strategy-review@users.noreply.github.com"
+            git add docs/monetization_roadmap.md
+            git commit -m "strategy-review: 週次所見を更新"
+            git push
+          else
+            echo "変更なし、コミットしない"
+          fi

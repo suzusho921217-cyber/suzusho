@@ -98,6 +98,7 @@ COMMANDS = [
     "daily-learning",
     "kill-switch",
     "agent-mtg",
+    "strategy-review",
 ]
 
 
@@ -1033,6 +1034,19 @@ def cmd_agent_mtg(args: argparse.Namespace) -> int:
     return 1 if result.error else 0
 
 
+def cmd_strategy_review(args: argparse.Namespace) -> int:
+    """経営企画役を週1で呼び、各媒体の収益化ラインまでの距離・到達見込み・
+
+    リソース配分・動画以外の収益経路・継続/撤退シグナルをまとめる。結果は
+    `docs/monetization_roadmap.md` の週次所見欄 ＋ `.state/strategy-<date>.json`
+    に残し、メールで報告する。config・コード・予算は変更しない（§ strategy-review）。
+    """
+    from src.strategy.review import run_and_report
+
+    result = run_and_report()
+    return 1 if result.error else 0
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="ai-media")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -1066,6 +1080,7 @@ def main(argv: list[str] | None = None) -> int:
         "publish": cmd_publish,
         "metrics": cmd_metrics,
         "agent-mtg": cmd_agent_mtg,
+        "strategy-review": cmd_strategy_review,
     }
     handler = handlers.get(args.command)
     if handler is None:
