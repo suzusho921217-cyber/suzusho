@@ -101,31 +101,41 @@ def _write_log(result: MtgResult) -> Path:
 
 
 def _email_body(result: MtgResult) -> str:
-    lines = [f"エージェントMTG {result.date}", ""]
+    """要点だけの HTML 本文。各役職の全文・統括レポートは .state/mtg-<date>.json に残す。"""
+    import html as _html
+
+    esc = _html.escape
+    cj = result.coordinator_json or {}
+    p: list[str] = [f"<h2 style='margin:0 0 8px'>エージェントMTG {esc(result.date)}</h2>"]
+
     if result.error:
-        lines.append(f"⚠ {result.error}")
-        lines.append("")
-    if result.coordinator_json:
-        lines.append(f"■ 結論: {result.coordinator_json.get('headline', '(headline無し)')}")
-        lines.append("")
-    lines.append("■ 統括の報告")
-    lines.append(result.transcripts.get("coordinator", "(無し)"))
-    lines.append("")
+        p.append(f"<p>⚠ {esc(result.error)}</p>")
+    if cj.get("headline"):
+        p.append(f"<p><b>結論:</b> {esc(str(cj['headline']))}</p>")
+
     if result.apply_results:
-        lines.append("■ 自動反映した内容")
-        lines.extend(f"  - {r}" for r in result.apply_results)
-        lines.append("")
-    needs_approval = (result.coordinator_json or {}).get("needs_user_approval") or []
-    if needs_approval:
-        lines.append("■ 要ユーザー承認（自動実行していません）")
-        for item in needs_approval:
-            cost = item.get("estimated_cost_jpy_per_month", 0)
-            lines.append(f"  - {item.get('description', '')}（月額目安: ¥{cost:,.0f}）")
-        lines.append("")
-    lines.append("--- 各役職の全文 ---")
-    for role_name in ("analyst", "researcher", "marketer", "critic"):
-        lines.append(f"\n## {role_name}\n{result.transcripts.get(role_name, '(無し)')}")
-    return "\n".join(lines)
+        li = "".join(f"<li>{esc(str(r))}</li>" for r in result.apply_results)
+        p.append(f"<h3 style='margin:12px 0 4px'>自動反映した変更</h3><ul>{li}</ul>")
+    else:
+        p.append("<p style='color:#666'>自動反映した変更: なし</p>")
+
+    needs = cj.get("needs_user_approval") or []
+    if needs:
+        li = ""
+        for it in needs:
+            cost = it.get("estimated_cost_jpy_per_month", 0) or 0
+            li += (
+                f"<li>{esc(str(it.get('description', '')))}"
+                f" <span style='color:#888'>（月額目安 ¥{cost:,.0f}）</span></li>"
+            )
+        p.append(f"<h3 style='margin:12px 0 4px'>要ユーザー承認（未実行）</h3><ul>{li}</ul>")
+
+    p.append(
+        "<p style='color:#999;font-size:12px;margin-top:16px'>"
+        f"各役職の全文・統括レポートは .state/mtg-{esc(result.date)}.json"
+        " / GitHub Actions のログ</p>"
+    )
+    return "".join(p)
 
 
 def run_and_report() -> MtgResult:
@@ -135,7 +145,7 @@ def run_and_report() -> MtgResult:
     subject = f"[AI動画自動投稿] エージェントMTG {result.date}"
     if result.coordinator_json:
         subject += f" - {result.coordinator_json.get('headline', '')[:40]}"
-    sent = send_alert_email(subject, _email_body(result))
+    sent = send_alert_email(subject, _email_body(result), html=True)
     print(f"[agent-mtg] メール送信: {'成功' if sent else '失敗/未設定'}")
     if result.apply_results:
         for r in result.apply_results:

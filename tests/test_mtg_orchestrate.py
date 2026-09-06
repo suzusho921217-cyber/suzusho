@@ -13,7 +13,7 @@ from src.mtg import orchestrate
 @pytest.fixture(autouse=True)
 def _no_network(monkeypatch):
     monkeypatch.setattr(orchestrate, "gather_context", lambda: "CONTEXT")
-    monkeypatch.setattr(orchestrate, "send_alert_email", lambda subject, body: True)
+    monkeypatch.setattr(orchestrate, "send_alert_email", lambda subject, body, **kw: True)
 
 
 def _coordinator_text(auto_apply=None, needs_approval=None):
@@ -105,7 +105,7 @@ def test_run_and_report_writes_log_and_sends_email(tmp_path, monkeypatch):
 
     sent = {}
     monkeypatch.setattr(orchestrate, "send_alert_email",
-                         lambda subject, body: sent.update(subject=subject, body=body) or True)
+                         lambda subject, body, **kw: sent.update(subject=subject, body=body, kw=kw) or True)
 
     result = orchestrate.run_and_report()
 
@@ -114,4 +114,6 @@ def test_run_and_report_writes_log_and_sends_email(tmp_path, monkeypatch):
     saved = json.loads(log_path.read_text(encoding="utf-8"))
     assert saved["coordinator_json"]["headline"] == "テスト結論"
     assert "テスト結論" in sent["subject"] or "エージェントMTG" in sent["subject"]
-    assert "統括の報告文" in sent["body"]
+    # 本文は要点のみの HTML（結論 headline を含む・全文の議事録は含めない）
+    assert sent["kw"].get("html") is True
+    assert "<h2" in sent["body"] and "テスト結論" in sent["body"]

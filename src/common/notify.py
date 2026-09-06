@@ -18,8 +18,12 @@ _SMTP_HOST = "smtp.gmail.com"
 _SMTP_PORT = 465
 
 
-def send_alert_email(subject: str, body: str) -> bool:
-    """送信できたら True。設定不足や送信失敗時は False（例外は投げない）。"""
+def send_alert_email(subject: str, body: str, *, html: bool = False) -> bool:
+    """送信できたら True。設定不足や送信失敗時は False（例外は投げない）。
+
+    html=True で HTML メールとして送る（Gmail は Markdown を解釈しないため、
+    見出し・箇条書きを効かせたい通知はこちら）。
+    """
     sender = env("GMAIL_SENDER_ADDRESS")
     password = env("GMAIL_APP_PASSWORD")
     to_addr = env("ALERT_EMAIL_TO")
@@ -27,7 +31,7 @@ def send_alert_email(subject: str, body: str) -> bool:
         print(f"[notify] 送信スキップ（GMAIL_SENDER_ADDRESS/GMAIL_APP_PASSWORD/ALERT_EMAIL_TO 未設定）: {subject}")
         return False
 
-    msg = MIMEText(body, _charset="utf-8")
+    msg = MIMEText(body, "html" if html else "plain", _charset="utf-8")
     msg["Subject"] = subject
     msg["From"] = sender
     msg["To"] = to_addr
