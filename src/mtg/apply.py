@@ -2,7 +2,7 @@
 
 費用・ポリシーに触れる変更は絶対にここを通さない（coordinatorのプロンプト側で
 auto_apply に入れないよう指示済みだが、ここでも構造的に不可能にする）。
-許可する操作（いずれも「1日6本・尺・投稿頻度・広告」は一切変えない＝費用不変）：
+許可する操作:
   - add_concept_tag / add_hook_type: config/planning.yaml のプールに1件追加
   - retire_concept_tag / retire_hook_type: 伸びない企画/フックをプールから外す
                       （最低数は残す。cat/dog の核を空にしない）
@@ -13,6 +13,11 @@ auto_apply に入れないよう指示済みだが、ここでも構造的に不
   - set_allocation_ratio: config/scoring.yaml の allocation.exploit_ratio /
                       explore_ratio（勝ちパターン活用 vs 新規探索の比率。合計1・
                       exploit は 0.3〜0.9 に制限）
+  - set_daily_slots: config/scoring.yaml の allocation.total_daily_slots（1日の生成本数）。
+                      月¥5,000 を絶対に超えないよう、`monthly_budget ÷ (1本の単価 × 20日)`
+                      を上限にクランプ（＝最低20日分は月内で回るペースしか許さない）。
+                      尺・広告・monthly_budget 自体は変えられない。実際の停止は
+                      generate 側の予算ゲート（95%到達で新規生成停止）が最終的に守る。
 
 コメント・整形を保つため ruamel.yaml のラウンドトリップローダを使う。
 """
@@ -130,6 +135,42 @@ def apply_set_level_range(brand: str, dimension: str, lo, hi) -> str:
     return f"[applied] {brand}.{key} を [{lo}, {hi}] に"
 
 
+def _price_per_video_jpy() -> float:
+    """config/generation.yaml から 1本あたりの概算単価（円）。720p 8秒なら ¥64。"""
+    gen = _load(CONFIG_DIR / "generation.yaml")
+    veo = gen.get("veo", {}) or {}
+    per_sec = float(veo.get("price_jpy_per_sec", 8) or 8)
+    durations = veo.get("allowed_durations", [8]) or [8]
+    return per_sec * max(int(d) for d in durations)
+
+
+def _max_daily_slots() -> int:
+    """月¥5,000（monthly_budget）を絶対に超えないための1日本数の上限。
+    最低20日は月内で回るペースしか許さない。"""
+    budget = _load(CONFIG_DIR / "budget.yaml")
+    monthly = float(budget.get("monthly_budget", 5000) or 5000)
+    per_video = _price_per_video_jpy()
+    return max(1, int(monthly / (per_video * 20)))
+
+
+def apply_set_daily_slots(count) -> str:
+    try:
+        count = int(count)
+    except (TypeError, ValueError) as e:
+        raise ApplyError("count が整数でない") from e
+    cap = _max_daily_slots()
+    if not (1 <= count <= cap):
+        raise ApplyError(
+            f"1日の本数は 1〜{cap}（月¥5,000 を超えないため）。指定: {count}"
+        )
+    path = CONFIG_DIR / "scoring.yaml"
+    data = _load(path)
+    data["allocation"]["total_daily_slots"] = count
+    _dump(path, data)
+    per_video = _price_per_video_jpy()
+    return f"[applied] 1日の生成本数を {count} 本に（1日 約¥{count * per_video:.0f}）"
+
+
 def apply_set_allocation_ratio(exploit, explore) -> str:
     try:
         exploit, explore = float(exploit), float(explore)
@@ -182,6 +223,7 @@ _HANDLERS = {
     "set_allocation_ratio": lambda item: apply_set_allocation_ratio(
         item.get("exploit"), item.get("explore"),
     ),
+    "set_daily_slots": lambda item: apply_set_daily_slots(item.get("count")),
 }
 
 

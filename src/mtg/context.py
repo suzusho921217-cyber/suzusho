@@ -86,11 +86,45 @@ def gather_context() -> str:
         parts.append(f"## {plan_path.name}（直近の配分・企画）\n" + json.dumps(plan, ensure_ascii=False, indent=2)[:4000])
 
     budget = load("budget")
-    parts.append("## config/budget.yaml（予算上限。この上限を超える提案はしない）\n" + json.dumps(budget, ensure_ascii=False, indent=2))
+    parts.append("## config/budget.yaml（予算上限。monthly_budget は絶対に超えない）\n" + json.dumps(budget, ensure_ascii=False, indent=2))
+
+    parts.append("## 生成費の消化状況（今月）\n" + _spend_summary(budget))
 
     parts.append("## 意思決定ログ（過去14日 + 未評価の判断）\n" + _decision_log_summary(store))
 
     return "\n\n".join(parts)
+
+
+def _spend_summary(budget: dict) -> str:
+    """今月の生成費 / 残額 / 残り日数 / 現在ペースの持ち日数。set_daily_slots のペース判断用。"""
+    import calendar
+
+    spend = _read_json(STATE_DIR / "spend.json") or {}
+    month = float(spend.get("month", 0.0))
+    monthly_budget = float(budget.get("monthly_budget", 5000) or 5000)
+    stop_at = monthly_budget * float(budget.get("automatic_stop_ratio", 0.95))
+    remaining = max(0.0, stop_at - month)
+
+    gen = load("generation").get("veo", {}) or {}
+    per_sec = float(gen.get("price_jpy_per_sec", 8) or 8)
+    per_video = per_sec * max(gen.get("allowed_durations") or [8])
+    slots = int(load("scoring")["allocation"].get("total_daily_slots", 3))
+
+    today = datetime.now(timezone(timedelta(hours=9))).date()
+    days_left = calendar.monthrange(today.year, today.month)[1] - today.day + 1
+    daily_cost = per_video * slots
+    days_covered = int(remaining // daily_cost) if daily_cost else 999
+    return json.dumps({
+        "今月の生成費": round(month),
+        "自動停止ライン(95%)": round(stop_at),
+        "残り(停止までに使える額)": round(remaining),
+        "今月の残り日数": days_left,
+        "1本の単価": round(per_video),
+        "現在の1日本数": slots,
+        "現ペースの1日コスト": round(daily_cost),
+        "現ペースで停止までに持つ日数": days_covered,
+        "月末まで持たせるなら1日": max(1, int(remaining / (days_left * per_video))) if days_left else slots,
+    }, ensure_ascii=False, indent=2)
 
 
 def _decision_log_summary(store) -> str:

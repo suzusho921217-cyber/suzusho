@@ -17,6 +17,7 @@ from src.mtg.apply import (
     apply_retire_concept_tag,
     apply_retire_hook_type,
     apply_set_allocation_ratio,
+    apply_set_daily_slots,
     apply_set_hashtags,
     apply_set_level_range,
 )
@@ -28,9 +29,9 @@ _REAL_CONFIG_DIR = apply_module.CONFIG_DIR
 def config_dir(tmp_path, monkeypatch):
     d = tmp_path / "config"
     d.mkdir()
-    shutil.copy(_REAL_CONFIG_DIR / "planning.yaml", d / "planning.yaml")
-    shutil.copy(_REAL_CONFIG_DIR / "hashtags.yaml", d / "hashtags.yaml")
-    shutil.copy(_REAL_CONFIG_DIR / "scoring.yaml", d / "scoring.yaml")
+    for name in ("planning.yaml", "hashtags.yaml", "scoring.yaml", "budget.yaml",
+                 "generation.yaml"):
+        shutil.copy(_REAL_CONFIG_DIR / name, d / name)
     monkeypatch.setattr(apply_module, "CONFIG_DIR", d)
     return d
 
@@ -125,10 +126,20 @@ def test_set_allocation_ratio_validates_sum_and_bounds(config_dir):
         apply_set_allocation_ratio(0.95, 0.05)   # exploit 上限0.9超え
 
 
+def test_set_daily_slots_within_budget_cap(config_dir):
+    # budget.yaml monthly_budget=5000, 720p 8秒 ¥64/本 → 上限 5000/(64*20) = 3
+    assert apply_set_daily_slots(2).startswith("[applied]")
+    assert _load(config_dir / "scoring.yaml")["allocation"]["total_daily_slots"] == 2
+    with pytest.raises(ApplyError):
+        apply_set_daily_slots(4)   # 月¥5,000 を超えるペース → 拒否
+    with pytest.raises(ApplyError):
+        apply_set_daily_slots(0)
+
+
 def test_apply_all_still_rejects_money_kinds(config_dir):
     results = apply_all([
-        {"kind": "set_daily_slots", "count": 20},         # 本数=お金 → 許可外
         {"kind": "set_video_duration", "seconds": 30},    # 尺=お金 → 許可外
+        {"kind": "boost_ad_spend", "amount_jpy": 5000},   # 広告=お金 → 許可外
     ])
     assert all("[rejected]" in r for r in results)
 
