@@ -37,6 +37,7 @@ from pathlib import Path
 
 JST = timezone(timedelta(hours=9))
 
+from src.common import state_sync
 from src.common.config import env, load
 from src.common.guardrails import (
     BudgetSpend,
@@ -312,10 +313,10 @@ def _job_from_dict(d: dict) -> GenerationJob:
     )
 
 
-def _load_plans(date: str | None) -> tuple[Path, list[ContentPlan]]:
+def _load_plans(date: str | None) -> tuple[Path | None, list[ContentPlan]]:
     path = STATE_DIR / f"plan-{date}.json" if date else _latest_state("plan-*.json")
     if path is None or not path.exists():
-        raise SystemExit("[generate] plan ファイルが無い。先に plan-daily を実行してください")
+        return None, []
     payload = json.loads(path.read_text(encoding="utf-8"))
     return path, [_plan_from_dict(p) for p in payload.get("plans", [])]
 
@@ -367,16 +368,30 @@ def cmd_generate(args: argparse.Namespace) -> int:
     出力: `.state/jobs-<date>.json`（poll-generation が続きを進める）。
     """
     plan_path, plans = _load_plans(args.date)
+    if plan_path is None:
+        print("[generate] plan ファイルが無い。plan-daily がまだ動いていない可能性 → 今回はスキップ")
+        return 0
     date = plan_path.stem.replace("plan-", "")
     if getattr(args, "limit", None):
         plans = plans[: int(args.limit)]
     provider = get_provider(_provider_name())
     budget_cfg = load("budget")
 
-    spend = _load_spend()
-    jobs, skipped = submit_plans(plans, provider, budget_gate=_spend_gate(spend, budget_cfg))
+    # 冪等化: generate は1日に複数回走る（07:00 / 10:00）。既に jobs-<date>.json に
+    # 投入済みのプランは再投入しない（= 二重生成・二重課金を防ぐ）。
+    out = STATE_DIR / f"jobs-{date}.json"
+    existing_payload = json.loads(out.read_text(encoding="utf-8")) if out.exists() else {}
+    existing_jobs = [_job_from_dict(d) for d in existing_payload.get("jobs", [])]
+    done_plan_ids = {j.plan_id for j in existing_jobs}
+    pending = [p for p in plans if p.plan_id not in done_plan_ids]
+    if not pending:
+        print(f"[generate] {out.name} に {len(existing_jobs)} 件投入済み・新規プランなし → スキップ")
+        return 0
 
-    plan_by_id = {p.plan_id: p for p in plans}
+    spend = _load_spend()
+    jobs, skipped = submit_plans(pending, provider, budget_gate=_spend_gate(spend, budget_cfg))
+
+    plan_by_id = {p.plan_id: p for p in pending}
     charged = 0.0
     for j in jobs:
         spend["by_brand"][plan_by_id[j.plan_id].brand.value] = round(
@@ -388,16 +403,16 @@ def cmd_generate(args: argparse.Namespace) -> int:
     spend["total"] = round(spend["total"] + charged, 2)
     _save_spend(spend)
 
-    out = STATE_DIR / f"jobs-{date}.json"
+    all_jobs = existing_jobs + jobs
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(json.dumps({
         "date": date, "provider": provider.name,
-        "jobs": [asdict(j) for j in jobs],
+        "jobs": [asdict(j) for j in all_jobs],
         "skipped": skipped,
     }, ensure_ascii=False, indent=2, default=str), encoding="utf-8")
 
     print(f"[generate] plan={plan_path.name} provider={provider.name} "
-          f"投入={len(jobs)} スキップ={len(skipped)} 概算 +¥{charged:.0f}")
+          f"投入={len(jobs)}（既存{len(existing_jobs)}）スキップ={len(skipped)} 概算 +¥{charged:.0f}")
     print(f"[generate] 今月の生成費 ¥{spend['month']:.0f} / 上限 ¥{budget_cfg.get('monthly_budget', 0):.0f}")
     for s in skipped:
         print(f"  ! {s['plan_id']}: {s['reason']}")
@@ -1011,29 +1026,33 @@ def main(argv: list[str] | None = None) -> int:
 
     args = parser.parse_args(argv)
 
-    if args.command == "plan-daily":
-        return cmd_plan_daily(args)
-    if args.command == "policy-sync":
-        return cmd_policy_sync(args)
-    if args.command == "daily-learning":
-        return cmd_daily_learning(args)
-    if args.command == "kill-switch":
-        return cmd_kill_switch(args)
-    if args.command == "generate":
-        return cmd_generate(args)
-    if args.command == "poll-generation":
-        return cmd_poll_generation(args)
-    if args.command == "media":
-        return cmd_media(args)
-    if args.command == "publish":
-        return cmd_publish(args)
-    if args.command == "metrics":
-        return cmd_metrics(args)
-    if args.command == "agent-mtg":
-        return cmd_agent_mtg(args)
+    handlers = {
+        "plan-daily": cmd_plan_daily,
+        "policy-sync": cmd_policy_sync,
+        "daily-learning": cmd_daily_learning,
+        "kill-switch": cmd_kill_switch,
+        "generate": cmd_generate,
+        "poll-generation": cmd_poll_generation,
+        "media": cmd_media,
+        "publish": cmd_publish,
+        "metrics": cmd_metrics,
+        "agent-mtg": cmd_agent_mtg,
+    }
+    handler = handlers.get(args.command)
+    if handler is None:
+        print(f"[cli] command={args.command} — not implemented yet")
+        return 0
 
-    print(f"[cli] command={args.command} — not implemented yet")
-    return 0
+    # ワークフロー間で .state/ を引き継ぐ（env STATE_SYNC=1 のときだけ／ローカルは no-op）。
+    # pull はコマンド実行前、push は成功・失敗によらず実行後（途中経過も残す）。
+    state_sync.pull()
+    try:
+        return handler(args)
+    finally:
+        try:
+            state_sync.push()
+        except Exception as e:  # noqa: BLE001 - push 失敗で本処理の結果を隠さない
+            print(f"[state-sync] push 失敗（この実行の .state は次回まで共有されない）: {e}")
 
 
 if __name__ == "__main__":

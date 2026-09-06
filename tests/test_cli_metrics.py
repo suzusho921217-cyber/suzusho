@@ -66,10 +66,13 @@ def test_metrics_tracks_followers_before_and_after(tmp_path, monkeypatch):
     monkeypatch.setattr(cli_module, "STATE_DIR", tmp_path)
     monkeypatch.setattr(cli_module, "get_publisher", lambda platform, brand=None: _FakeAccountPublisher())
 
+    # published_at は「今」に固定する。過去日を直書きすると実行日次第で 24h/72h/7d の
+    # スナップショットも due になり件数が変わる（このテストは latest 1 件だけを見たい）。
+    now = datetime.now(_JST)
     store = LocalStore(tmp_path / "db")
     store.upsert_account_daily(AccountDaily(
-        date="2026-09-03", brand=Brand.DOG, platform=Platform.YOUTUBE,
-        account_id="dog-youtube", followers=100,
+        date=(now - timedelta(days=3)).date().isoformat(), brand=Brand.DOG,
+        platform=Platform.YOUTUBE, account_id="dog-youtube", followers=100,
     ))
     store.upsert_post(Post(
         post_key="p1:youtube", master_video_id="p1", brand=Brand.DOG,
@@ -77,7 +80,7 @@ def test_metrics_tracks_followers_before_and_after(tmp_path, monkeypatch):
         hook_type="h", character_id="DOG_001", duration_sec=8, oddity_level=1,
         prompt_version="v1", generation_cost_jpy=32.0, policy_version="v1",
         policy_result=PolicyDecision.PASS, status=PostStatus.PUBLISHED,
-        published_at=datetime(2026, 9, 5, 0, 0, tzinfo=timezone.utc),
+        published_at=now,
         platform_post_id="yt-1",
     ))
 

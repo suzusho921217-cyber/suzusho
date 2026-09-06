@@ -62,7 +62,21 @@ def test_generate_tracks_spend_across_runs(plan_file, tmp_path, monkeypatch):
     assert "month_key" in spend
 
 
-def test_generate_without_plan_file_errors(tmp_path, monkeypatch):
+def test_generate_is_idempotent_across_runs(plan_file, tmp_path, monkeypatch, capsys):
+    # generate は 1 日に複数回走る。2 回目は投入済みプランを再投入しない（二重生成防止）。
     monkeypatch.setattr("src.cli.STATE_DIR", tmp_path)
-    with pytest.raises(SystemExit):
-        main(["generate", "--date", "2099-01-01"])
+    main(["generate", "--date", "2026-09-02"])
+    rc = main(["generate", "--date", "2026-09-02"])
+    assert rc == 0
+    jobs = json.loads((tmp_path / "jobs-2026-09-02.json").read_text(encoding="utf-8"))
+    assert len(jobs["jobs"]) == 6  # 12 にならない
+    assert "スキップ" in capsys.readouterr().out
+
+
+def test_generate_without_plan_file_skips(tmp_path, monkeypatch, capsys):
+    # plan がまだ無い（plan-daily 未実行）ときは失敗ではなくスキップ（exit 0）。
+    # ワークフローが独立スケジュールで走るため、順番前後を失敗通知にしない。
+    monkeypatch.setattr("src.cli.STATE_DIR", tmp_path)
+    rc = main(["generate", "--date", "2099-01-01"])
+    assert rc == 0
+    assert "スキップ" in capsys.readouterr().out

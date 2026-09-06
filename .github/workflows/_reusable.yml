@@ -34,6 +34,10 @@ jobs:
           # 必要な Secrets を Environment から注入（実キーはコード/Sheetsに保存しない）
           SHEETS_SPREADSHEET_ID: ${{ secrets.SHEETS_SPREADSHEET_ID }}
           GOOGLE_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
+          # ワークフロー間の .state/ 引き継ぎ（§15）。GCS を共有ストアにする
+          # （バケットは下の GCS_BUCKET_NAME を流用）。各ワークフローは独立スケジュールの
+          # ままで、pull → 実行 → 変更分だけ push。
+          STATE_SYNC: "1"
           VIDEO_PROVIDER: ${{ vars.VIDEO_PROVIDER }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}   # VIDEO_PROVIDER=veo（§12）
           PUBLISH_MODE: ${{ vars.PUBLISH_MODE }}          # 未設定なら dryrun

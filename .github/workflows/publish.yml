@@ -2,8 +2,13 @@
 name: publish
 on:
   schedule:
-    - cron: "0 3,9,12 * * *"
+    - cron: "0 3,9,12 * * *"  # 12:00 / 18:00 / 21:00 JST
   workflow_dispatch:
+
+concurrency:
+  group: sns-pipeline-state
+  cancel-in-progress: false
+
 jobs:
   call:
     uses: ./.github/workflows/_reusable.yml

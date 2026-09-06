@@ -1,0 +1,18 @@
+# §5 media: 生成完了マスターを 9:16・音量正規化 → 媒体別派生に加工。
+# poll_generation（*/20）が DL した直後を拾えるよう、少しずらした間隔で回す。
+name: media
+on:
+  schedule:
+    - cron: "10,30,50 * * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: sns-pipeline-state
+  cancel-in-progress: false
+
+jobs:
+  call:
+    uses: ./.github/workflows/_reusable.yml
+    with:
+      command: media
+    secrets: inherit

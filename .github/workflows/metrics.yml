@@ -4,6 +4,11 @@ on:
   schedule:
     - cron: "0 19 * * *"  # 04:00 JST（daily_learning 05:00 JST の前）。まずは1日1回で様子見
   workflow_dispatch:
+
+concurrency:
+  group: sns-pipeline-state
+  cancel-in-progress: false
+
 jobs:
   call:
     uses: ./.github/workflows/_reusable.yml

@@ -62,10 +62,10 @@ AIショートメディア完全自動運用基盤（設計書 v1.0 の実装）
 ## ディレクトリ
 
 ```
-.github/workflows/   8本のワークフロー + _reusable.yml（§5）
+.github/workflows/   スケジュール別 9本 + ci.yml + _reusable.yml（§5）
 src/
-  cli.py             GitHub Actions からの単一エントリポイント
-  common/            models.py（§6§10）/ config.py / guardrails.py（§13§14）
+  cli.py             GitHub Actions からの単一エントリポイント（前後で state_sync が働く）
+  common/            models.py（§6§10）/ config.py / guardrails.py（§13§14）/ state_sync.py（§15）
   planner/           企画生成・配分（§6§11）
   policy/            ポリシーエンジン（§7§8）
   generation/        base.py（Provider IF）/ providers/mock.py / quality.py（§12）
@@ -90,6 +90,28 @@ Scheduler → Planner → Policy Engine → Video Provider Adapter → Quality G
   → FFmpeg → [YouTube/TikTok/Instagram/X Adapter] → Google Sheets
   → Metrics Collector → Learning Engine → 翌日配分
 ```
+
+各工程は別々のワークフローで**決まった時刻に独立起動**する（JST）:
+metrics 04:00 → daily_learning 05:00 → agent_mtg 05:37 → policy_sync 06:00 →
+plan_daily 06:30 → generate 07:00/10:00 → poll_generation `*/20` → media `10,30,50` →
+publish 12:00/18:00/21:00、kill_switch 毎時。
+
+### ワークフロー間の state 共有（§15）
+
+GitHub Actions のランは毎回まっさらな clone から始まり `.state/` が空になる。工程を
+またいで plan / jobs / spend / winning_tags / 生成済み mp4 を渡すため、`.state/` の実体を
+**GCS バケット**（`GCS_BUCKET_NAME` の `state/` プレフィックス）に置く。
+
+- `src/common/state_sync.py`: コマンド実行の前に `pull()`（リモート → `.state/`）、
+  後に `push()`（pull 時点から**変わった/増えたファイルだけ**アップロード）。
+- 有効化は env `STATE_SYNC=1`（`_reusable.yml` と `agent_mtg.yml` で設定済み）。
+  未設定のローカル実行・pytest では完全に no-op。
+- 同時実行対策: 全パイプラインワークフローに共通の `concurrency: group: sns-pipeline-state`
+  を付け、GCS 上の state を1本ずつ順に触る。no-op で終わったランは何も push しない。
+- `generate` は1日複数回走るが冪等（`jobs-<date>.json` に投入済みのプランは再投入しない）。
+  plan がまだ無い時刻に起動しても失敗ではなくスキップ（exit 0）。
+- `spend.json`（生成費の積み上げ）は予算ゲートの起点なので必ず引き継ぐ。移行時に現在値を
+  `state/spend.json` へ手で seed 済み。
 
 ## セットアップ
 

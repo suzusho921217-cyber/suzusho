@@ -1,10 +1,17 @@
 # §5 generate: 生成ジョブ投入のみ。生成待ちで Runner を占有しない。
+# 1日に複数回走るが cmd_generate は冪等（投入済みプランは再投入しない）。
 name: generate
 on:
   schedule:
-    - cron: "0 22 * * *"
-    - cron: "0 1 * * *"
+    - cron: "0 22 * * *"  # 07:00 JST（plan_daily 06:30 の後）
+    - cron: "0 1 * * *"   # 10:00 JST（取りこぼし・追加プランの再投入）
   workflow_dispatch:
+
+# 全パイプラインワークフローで共有。GCS 上の .state/ を1本ずつ順に触る。
+concurrency:
+  group: sns-pipeline-state
+  cancel-in-progress: false
+
 jobs:
   call:
     uses: ./.github/workflows/_reusable.yml

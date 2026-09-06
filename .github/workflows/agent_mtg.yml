@@ -10,6 +10,11 @@ on:
 permissions:
   contents: write
 
+# パイプラインの .state/ を読む（勝ちタグ・plan・成績）ので同じ直列グループに入れる。
+concurrency:
+  group: sns-pipeline-state
+  cancel-in-progress: false
+
 jobs:
   run:
     runs-on: ubuntu-latest
@@ -33,6 +38,10 @@ jobs:
           GMAIL_SENDER_ADDRESS: ${{ secrets.GMAIL_SENDER_ADDRESS }}
           GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
           ALERT_EMAIL_TO: ${{ secrets.ALERT_EMAIL_TO }}
+          # 共有 .state/ を読み書き（勝ちタグ・plan・成績を材料にする / mtg-<date>.json を残す）
+          STATE_SYNC: "1"
+          GCS_BUCKET_NAME: ${{ secrets.GCS_BUCKET_NAME }}
+          GOOGLE_CLOUD_PROJECT: ${{ secrets.GOOGLE_CLOUD_PROJECT }}
         run: python -m src.cli agent-mtg
 
       - name: 状態退避
