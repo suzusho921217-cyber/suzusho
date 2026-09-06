@@ -596,19 +596,52 @@ def cmd_publish(args: argparse.Namespace) -> int:
     }
     guard_map = _guard_map()
     mode = env("PUBLISH_MODE", "dryrun")
+    limit = getattr(args, "limit", None)
+
+    # 投稿対象の動画を企画（plan）の並び順に整える。1回の publish 実行で投稿する
+    # 動画数を --limit で絞り、残りは次の実行に回す（媒体アルゴリズムの初速テストを
+    # 動画ごとに独立させ、フォロワーの初動を1本に集中させるため）。
+    plan_order = {pid: i for i, pid in enumerate(plans)}
+    ready = [
+        (jd, plans[jd["plan_id"]])
+        for jd in payload.get("jobs", [])
+        if jd.get("status") == GenerationStatus.SUCCEEDED.value and jd.get("plan_id") in plans
+    ]
+    ready.sort(key=lambda t: plan_order.get(t[1].plan_id, 1_000))
 
     outcomes: list[dict] = []
-    for jd in payload.get("jobs", []):
-        if jd.get("status") != GenerationStatus.SUCCEEDED.value:
+    published_videos = 0
+    for jd, plan in ready:
+        # 媒体ごとの状況を仕分ける。既に投稿済みの媒体はこの回の本数に数えない。
+        pending: list[Platform] = []
+        for platform in plan.target_platforms:
+            account_id = f"{plan.brand.value}-{platform.value}"
+            prior = store.get_post(f"{plan.plan_id}:{platform.value}")
+            if prior and prior.status is PostStatus.PUBLISHED and prior.platform_post_id:
+                outcomes.append(asdict(PublishOutcome(
+                    plan.plan_id, platform, "ALREADY_PUBLISHED", prior.platform_post_id,
+                    policy_version(platform), ["管理DBに投稿済み記録あり（§15）"],
+                )))
+                ledger[f"{plan.plan_id}|{platform.value}|{account_id}"] = prior.platform_post_id
+            else:
+                pending.append(platform)
+        if not pending:
             continue
-        plan = plans.get(jd.get("plan_id"))
-        if plan is None:
+
+        if limit is not None and published_videos >= limit:
+            for platform in pending:
+                outcomes.append(asdict(PublishOutcome(
+                    plan.plan_id, platform, "DEFERRED", None, policy_version(platform),
+                    [f"この回の投稿上限 {limit} 本に到達。次の publish 実行に回す"],
+                )))
             continue
+
         # 同じ動画を複数媒体に使い回すため、生成費は媒体数で均等分割して記録する
         # （そのまま複製すると合計が実際の支出より水増しされる）。
         n_platforms = len(plan.target_platforms) or 1
         cost_per_platform = float(jd.get("cost_jpy", 0.0)) / n_platforms
-        for platform in plan.target_platforms:
+        video_ocs: list[PublishOutcome] = []
+        for platform in pending:
             account_id = f"{plan.brand.value}-{platform.value}"  # TODO: アカウント設定を config 化
             post = Post(
                 post_key=f"{plan.plan_id}:{platform.value}",
@@ -639,18 +672,8 @@ def cmd_publish(args: argparse.Namespace) -> int:
                 caption=caption.strip(),
                 tags=tags,
             )
-            # 冪等化の第一段: 管理DBに投稿済み記録があれば媒体APIを叩かずスキップ（§15）。
-            # 媒体側の目印（IGのキャプション埋め込み等）は、DB書き込みに失敗した隙間を
-            # 埋めるための第二の安全網として decide_and_publish 側に残す。
-            prior = store.get_post(post.post_key)
-            if prior and prior.status is PostStatus.PUBLISHED and prior.platform_post_id:
-                outcomes.append(asdict(PublishOutcome(
-                    plan.plan_id, platform, "ALREADY_PUBLISHED", prior.platform_post_id,
-                    policy_version(platform), ["管理DBに投稿済み記録あり（§15）"],
-                )))
-                ledger[f"{plan.plan_id}|{platform.value}|{account_id}"] = prior.platform_post_id
-                continue
-
+            # 冪等化の第二段（媒体側の目印。DB書き込みに失敗した隙間を埋める安全網）は
+            # decide_and_publish 側に残す。第一段の DB チェックは pending 仕分けで済み。
             publisher = (
                 DryRunPublisher(platform, ledger=ledger)
                 if mode == "dryrun" else get_publisher(platform, mode=mode, brand=plan.brand)
@@ -671,7 +694,13 @@ def cmd_publish(args: argparse.Namespace) -> int:
                     oc.platform_post_id
                 )
             store.upsert_post(post)
+            video_ocs.append(oc)
             outcomes.append(asdict(oc))
+
+        # 1媒体でも実際に投稿できた動画だけを「この回の投稿数」に数える。
+        # ガードや規約で止まった動画は上限を消費せず、次の回も再挑戦する。
+        if any(oc.published for oc in video_ocs):
+            published_videos += 1
 
     STATE_DIR.mkdir(parents=True, exist_ok=True)
     (STATE_DIR / f"publish-{date}.json").write_text(
@@ -685,9 +714,10 @@ def cmd_publish(args: argparse.Namespace) -> int:
         by_action[oc["action"]] = by_action.get(oc["action"], 0) + 1
     print(f"[publish] date={date} mode={mode} → {by_action}")
     for oc in outcomes:
-        if oc["action"] not in ("PUBLISHED", "ALREADY_PUBLISHED"):
-            print(f"  ! {oc['plan_id']} [{oc['platform']}] {oc['action']}: "
-                  f"{'; '.join(oc['reasons'])}")
+        if oc["action"] in ("PUBLISHED", "ALREADY_PUBLISHED", "DEFERRED"):
+            continue
+        print(f"  ! {oc['plan_id']} [{oc['platform']}] {oc['action']}: "
+              f"{'; '.join(oc['reasons'])}")
     print(f"[publish] wrote {STATE_DIR / f'publish-{date}.json'}")
     return 0
 
@@ -1066,6 +1096,12 @@ def main(argv: list[str] | None = None) -> int:
             p.add_argument("--date", help="対象日 YYYY-MM-DD (default: .state の最新)")
         if name == "generate":
             p.add_argument("--limit", type=int, help="先頭 N 件だけ投入（テスト・小予算用）")
+        if name == "publish":
+            p.add_argument(
+                "--limit", type=int, default=None,
+                help="1回の実行で投稿する動画数の上限（既定: 制限なし）。"
+                     "投稿を複数の時間帯に分散させるために使う",
+            )
 
     args = parser.parse_args(argv)
 

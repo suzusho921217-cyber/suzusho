@@ -1,8 +1,13 @@
 # §5 publish: 投稿時間ごとに媒体別ポリシー再判定→投稿。
+# 1日分（3本）を1回でまとめて投稿すると、媒体アルゴリズムの初速テストで
+# 互いに食い合い・フォロワーの初動が分散する。→ 12:00 と 18:00 は1本ずつ、
+# 21:00（その日の最終回）で残りを全部投稿して取りこぼしを回収する。
 name: publish
 on:
   schedule:
-    - cron: "0 3,9,12 * * *"  # 12:00 / 18:00 / 21:00 JST
+    - cron: "0 3 * * *"   # 12:00 JST — 1本
+    - cron: "0 9 * * *"   # 18:00 JST — 1本
+    - cron: "0 12 * * *"  # 21:00 JST — 残り全部
   workflow_dispatch:
 
 concurrency:
@@ -10,7 +15,18 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  call:
+  # 12:00 / 18:00 JST: 未投稿のうち1本だけ投稿。残りは次の回へ。
+  spread:
+    if: github.event_name == 'schedule' && github.event.schedule != '0 12 * * *'
+    uses: ./.github/workflows/_reusable.yml
+    with:
+      command: publish
+      extra_args: "--limit 1"
+    secrets: inherit
+
+  # 21:00 JST（最終回）と手動実行: 準備できている分を全部投稿。
+  flush:
+    if: github.event_name == 'workflow_dispatch' || github.event.schedule == '0 12 * * *'
     uses: ./.github/workflows/_reusable.yml
     with:
       command: publish

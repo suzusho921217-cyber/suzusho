@@ -96,6 +96,11 @@ metrics 04:00 → daily_learning 05:00 → agent_mtg 05:37 → policy_sync 06:00
 plan_daily 06:30 → generate 07:00/10:00 → poll_generation `*/20` → media `10,30,50` →
 publish 12:00/18:00/21:00、kill_switch 毎時。
 
+**publish は1日分をまとめて出さず時間帯に分散する**: 12:00・18:00 は未投稿のうち
+1本ずつ（`--limit 1`）、21:00（その日の最終回）で残りを全部投稿して取りこぼしを回収。
+媒体アルゴリズムの初速テストで動画が互いに食い合うのと、フォロワーの初動が分散するのを
+避けるため。手動実行（workflow_dispatch）は従来どおり準備できた分を全部投稿する。
+
 ### ワークフロー間の state 共有（§15）
 
 GitHub Actions のランは毎回まっさらな clone から始まり `.state/` が空になる。工程を
