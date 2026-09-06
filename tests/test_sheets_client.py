@@ -255,6 +255,33 @@ def test_local_store_decision_roundtrip(tmp_path):
     assert len(got2) == 1 and got2[0].result == "成功"
 
 
+def test_decision_log_column_labels_are_pinned():
+    # 意思決定ログのシート見出し（日本語ラベル）を固定する。
+    # スプシ側でラベルを変えたらここも変えること（変えないと書き込みが黙って捨てられる）。
+    # 列の並び替えはテキストマッチなので自由。ラベルの文言だけがコードと一致していれば良い。
+    assert DECISION_HEADERS_JA == {
+        "decision_id": "判断ID",
+        "date": "日付",
+        "account": "対象",
+        "hypothesis": "仮説",
+        "data_used": "使ったデータ",
+        "agent_opinions": "各エージェントの意見",
+        "critic_objection": "批判エージェントの反論",
+        "decision": "最終決定",
+        "changed_vars": "変える変数",
+        "unchanged_vars": "変えない変数",
+        "expected_kpi": "期待KPI",
+        "success_criteria": "成功/失敗の基準",
+        "review_date": "再評価日",
+        "confidence": "確信度",
+        "data_sufficient": "データ",
+        "result": "結果",
+        "result_reason": "結果の理由",
+        "actual_kpi": "実績値",
+        "reviewed_date": "再評価した日",
+    }
+
+
 def test_sheets_store_decision_roundtrip_and_upsert():
     tabs = {"意思決定ログ": [_DECISION_HEADER_JA]}
     store = _fake_store(tabs)
