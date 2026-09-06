@@ -36,6 +36,28 @@ def test_publish_dryrun_publishes_all(generated):
     assert all(p["status"] == "PUBLISHED" and p["platform_post_id"] for p in posts.values())
 
 
+def test_publish_limit_spreads_videos_across_runs(generated):
+    # --limit 1: 1回の実行で1動画だけ投稿。残りは DEFERRED で次の回に回す。
+    main(["publish", "--date", "2026-09-02", "--limit", "1"])
+    pub = json.loads((generated / "publish-2026-09-02.json").read_text(encoding="utf-8"))
+    actions = [o["action"] for o in pub["outcomes"]]
+    assert actions.count("PUBLISHED") == 2       # 1動画 × youtube/instagram
+    assert actions.count("DEFERRED") == (_SLOTS - 1) * 2
+    assert sum(1 for p in _posts(generated).values() if p["status"] == "PUBLISHED") == 2
+
+    # 2回目（--limit 1）: 投稿済みは数えず、次の1動画が出る。
+    main(["publish", "--date", "2026-09-02", "--limit", "1"])
+    pub = json.loads((generated / "publish-2026-09-02.json").read_text(encoding="utf-8"))
+    actions = [o["action"] for o in pub["outcomes"]]
+    assert actions.count("ALREADY_PUBLISHED") == 2
+    assert actions.count("PUBLISHED") == 2
+    assert sum(1 for p in _posts(generated).values() if p["status"] == "PUBLISHED") == 4
+
+    # 3回目（上限なし = flush）: 残り全部。
+    main(["publish", "--date", "2026-09-02"])
+    assert sum(1 for p in _posts(generated).values() if p["status"] == "PUBLISHED") == _SLOTS * 2
+
+
 def test_publish_is_idempotent_second_run(generated):
     main(["publish", "--date", "2026-09-02"])
     main(["publish", "--date", "2026-09-02"])
