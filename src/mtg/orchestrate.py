@@ -131,34 +131,30 @@ def _email_body(result: MtgResult) -> str:
 
     if result.error:
         p.append(f"<p>⚠️ {esc(result.error)}</p>")
+
+    # 1. 結論
     if cj.get("headline"):
         p.append(
             "<p style='background:#f4f6f8;padding:10px 12px;border-radius:6px'>"
             f"<b>📋 結論</b><br>{_paras(cj['headline'])}</p>"
         )
 
-    topics = cj.get("agent_topics") or {}
-    if topics:
-        li = "".join(
-            f"<li><b>{_ROLE_LABELS.get(k, k)}</b>：{_paras(topics[k])}</li>"
-            for k in ("analyst", "researcher", "marketer", "critic")
-            if topics.get(k)
-        )
-        if li:
-            p.append(
-                "<h3 style='margin:16px 0 4px'>🤖 各エージェントのポイント</h3>"
-                f"<ul style='margin:0;padding-left:20px'>{li}</ul>"
-            )
-
+    # 自動で反映した変更があれば、承認不要でも必ず知らせる（透明性）
     if result.apply_results:
         li = "".join(f"<li>{esc(str(r))}</li>" for r in result.apply_results)
         p.append(
-            "<h3 style='margin:16px 0 4px'>✅ 自動反映した変更</h3>"
+            "<h3 style='margin:16px 0 4px'>✅ 自動で反映した変更</h3>"
             f"<ul style='margin:0;padding-left:20px'>{li}</ul>"
         )
-    else:
-        p.append("<p style='color:#666;margin:16px 0 0'>✅ 自動反映した変更：なし</p>")
 
+    # 2. 収益化までの進捗
+    if cj.get("monetization_progress"):
+        p.append(
+            "<h3 style='margin:16px 0 4px'>💰 収益化までの進捗</h3>"
+            f"<p style='margin:0'>{_paras(cj['monetization_progress'])}</p>"
+        )
+
+    # 3. 要ユーザー承認
     needs = cj.get("needs_user_approval") or []
     if needs:
         li = ""
@@ -173,10 +169,23 @@ def _email_body(result: MtgResult) -> str:
             f"<ul style='margin:0;padding-left:20px'>{li}</ul>"
         )
 
+    # 4. 各エージェントのポイント
+    topics = cj.get("agent_topics") or {}
+    li = "".join(
+        f"<li><b>{_ROLE_LABELS.get(k, k)}</b>：{_paras(topics[k])}</li>"
+        for k in ("analyst", "researcher", "marketer", "critic")
+        if topics.get(k)
+    )
+    if li:
+        p.append(
+            "<h3 style='margin:16px 0 4px'>🤖 各エージェントのポイント</h3>"
+            f"<ul style='margin:0;padding-left:20px'>{li}</ul>"
+        )
+
     p.append(
         "<p style='color:#999;font-size:12px;margin-top:18px'>"
-        f"📄 各役職の全文・統括レポートは .state/mtg-{esc(result.date)}.json"
-        " / GitHub Actions のログ</p></div>"
+        f"📄 各役職の全文・意思決定ログは .state/mtg-{esc(result.date)}.json"
+        " / GitHub Actions のログ / スプレッドシート</p></div>"
     )
     return "".join(p)
 
