@@ -56,12 +56,25 @@ jobs:
 
       - name: 週次所見の更新をコミット
         run: |
-          if [ -n "$(git status --porcelain docs/monetization_roadmap.md)" ]; then
-            git config user.name "strategy-review[bot]"
-            git config user.email "strategy-review@users.noreply.github.com"
+          git config user.name "strategy-review[bot]"
+          git config user.email "strategy-review@users.noreply.github.com"
+          # checkout が古い SHA（再実行など）でも、常に最新 main の上に所見を載せ直して push。
+          # main が動いていて衝突したら数回リトライ。最後まで push できなくても workflow は
+          # 失敗させない（翌週の実行で反映される）。
+          for i in 1 2 3; do
+            git fetch -q origin main
+            git checkout -q -B main origin/main
+            git checkout -q origin/main -- docs/monetization_roadmap.md
+            python -c "import json,glob; from src.strategy.review import _update_roadmap; \
+              d=json.load(open(sorted(glob.glob('.state/strategy-*.json'))[-1])); p=d.get('parsed') or {}; \
+              p.get('weekly_note') and _update_roadmap(p['weekly_note'], d['date'])"
+            if [ -z "$(git status --porcelain docs/monetization_roadmap.md)" ]; then
+              echo "変更なし、コミットしない"; exit 0
+            fi
             git add docs/monetization_roadmap.md
-            git commit -m "strategy-review: 週次所見を更新"
-            git push
-          else
-            echo "変更なし、コミットしない"
-          fi
+            git commit -q -m "strategy-review: 週次所見を更新"
+            if git push -q origin main; then echo "pushed"; exit 0; fi
+            git reset -q --hard HEAD~1
+            sleep 5
+          done
+          echo "::warning::週次所見を push できなかった（翌週の実行で反映される）"
