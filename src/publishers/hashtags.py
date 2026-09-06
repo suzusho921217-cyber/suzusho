@@ -34,16 +34,38 @@ def select_caption_cta(
     return pool[_seed(concept_tag, date) % len(pool)]
 
 
+# 品種 → その品種ならではのタグ（JP/EN 各1）。publish 時に企画の品種から自動で足す。
+# 「柴犬なら #柴犬 #shibainu を付ける」の一般化。
+_BREED_TAGS: dict[str, list[str]] = {
+    "dog_shiba": ["#柴犬", "#shibainu"],
+    "dog_golden_retriever": ["#ゴールデンレトリバー", "#goldenretriever"],
+    "dog_corgi": ["#コーギー", "#corgi"],
+    "dog_pomeranian": ["#ポメラニアン", "#pomeranian"],
+    "dog_french_bulldog": ["#フレンチブルドッグ", "#frenchbulldog"],
+    "dog_toy_poodle": ["#トイプードル", "#toypoodle"],
+    "dog_beagle": ["#ビーグル", "#beagle"],
+    "cat_persian": ["#ペルシャ猫", "#persiancat"],
+    "cat_munchkin": ["#マンチカン", "#munchkin"],
+    "cat_british_shorthair": ["#ブリティッシュショートヘア", "#britishshorthair"],
+    "cat_scottish_fold": ["#スコティッシュフォールド", "#scottishfold"],
+    "cat_ragdoll": ["#ラグドール", "#ragdoll"],
+    "cat_calico": ["#三毛猫", "#calicocat"],
+    "cat_tabby": ["#キジトラ", "#tabbycat"],
+}
+
+
 def select_hashtags(
     brand: str,
     platform: str,
     *,
     date: str,
+    character_id: str | None = None,
     config: Mapping[str, Any] | None = None,
 ) -> list[str]:
     cfg = (config if config is not None else load("hashtags"))
     spec = ((cfg.get(brand) or {}).get(platform) or {})
     tags: list[str] = list(spec.get("always") or [])
+    tags += _BREED_TAGS.get(character_id or "", [])
 
     pool = list(spec.get("pool") or [])
     n = int(spec.get("per_video", 3))

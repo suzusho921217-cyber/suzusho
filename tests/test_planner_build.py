@@ -31,6 +31,27 @@ def _alloc(**brands) -> DailyAllocation:
     return DailyAllocation(sum(b.total for b in bs), "performance", bs)
 
 
+def test_explore_rotates_through_breed_pool():
+    # explore 枠は品種プール（config/planning.yaml の characters）を巡回する。
+    pool_cfg = {
+        "defaults": {"prompt_version": "v3", "duration_target_sec": [8, 15]},
+        "brands": {"cat": {
+            "characters": ["cat_a", "cat_b", "cat_c"],
+            "policy_risk": "LOW",
+            "concept_tags": ["c1", "c2", "c3", "c4"], "hook_types": ["h1", "h2"],
+            "reality_level": [4, 5], "oddity_level": [1, 2],
+        }},
+    }
+    alloc = _alloc(cat=(0, 4))  # explore 4 本
+    plans = build_daily_plan("2026-08-31", alloc, [], pool_cfg, PLATFORMS)
+    breeds = [p.character_id for p in plans]
+    assert set(breeds) <= {"cat_a", "cat_b", "cat_c"}
+    assert len(set(breeds)) >= 2  # 1 品種に偏らない
+    # 決定的
+    again = [p.character_id for p in build_daily_plan("2026-08-31", alloc, [], pool_cfg, PLATFORMS)]
+    assert breeds == again
+
+
 def test_bootstrap_plan_all_explore_correct_count():
     alloc = next_day_allocation([], ALLOC_CFG, [Brand.CAT, Brand.DOG])
     plans = build_daily_plan("2026-08-31", alloc, [], PLANNING, PLATFORMS)

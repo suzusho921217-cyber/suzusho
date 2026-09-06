@@ -620,7 +620,10 @@ def cmd_publish(args: argparse.Namespace) -> int:
                 policy_version="", policy_result=PolicyDecision.PASS,
                 status=PostStatus.PUBLISHING,
             )
-            tags = select_hashtags(plan.brand.value, platform.value, date=date)
+            tags = select_hashtags(
+                plan.brand.value, platform.value, date=date,
+                character_id=plan.character_id,
+            )
             cta = select_caption_cta(plan.concept_tag, date=date)
             species = {"cat": "子猫", "dog": "子犬"}.get(plan.brand.value, "")
             caption = f"{plan.concept_tag}な{species}"

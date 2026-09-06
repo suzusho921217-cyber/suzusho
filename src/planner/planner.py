@@ -212,6 +212,14 @@ def _explore_combos(pool: dict, brand_winning: list[dict], seed: int) -> list[tu
     return out
 
 
+def _brand_characters(pool: dict) -> tuple[str, ...]:
+    """ブランドの品種プール。`characters`（複数）優先、無ければ `character_id`（単数）。"""
+    chars = pool.get("characters")
+    if chars:
+        return tuple(str(c) for c in chars)
+    return (str(pool.get("character_id", f"{pool.get('policy_risk', 'X')}_char")),)
+
+
 @dataclass(frozen=True)
 class _PlanCtx:
     """1 ブランド分の企画生成に必要な確定値。"""
@@ -219,13 +227,17 @@ class _PlanCtx:
     brand: Brand
     pool: dict
     risk: PolicyRisk
-    character_id: str
+    characters: tuple[str, ...]
     prompt_version: str
     duration_range: object
     platforms: list[Platform]
 
     def _level(self, key: str, nonce: int) -> int:
         return _pick_in_range(self.pool[key], nonce)
+
+    def pick_character(self, nonce: int) -> str:
+        """explore 枠の品種を決定的に巡回選択する。"""
+        return self.characters[nonce % len(self.characters)]
 
 
 def _explore_plan(
@@ -239,7 +251,7 @@ def _explore_plan(
         brand=ctx.brand,
         concept_tag=concept_tag,
         hook_type=hook_type,
-        character_id=ctx.character_id,
+        character_id=ctx.pick_character(nonce),
         reality_level=ctx._level("reality_level", nonce),
         oddity_level=ctx._level("oddity_level", nonce),
         duration_target_sec=_pick_in_range(ctx.duration_range, nonce),
@@ -260,7 +272,7 @@ def _exploit_plan(
         brand=ctx.brand,
         concept_tag=str(wt.get("concept_tag", fallback_combo[0])),
         hook_type=str(wt.get("hook_type", fallback_combo[1])),
-        character_id=str(wt.get("character_id", ctx.character_id)),
+        character_id=str(wt.get("character_id", ctx.pick_character(nonce))),
         reality_level=int(wt.get("reality_level", ctx._level("reality_level", nonce))),
         oddity_level=int(wt.get("oddity_level", ctx._level("oddity_level", nonce))),
         duration_target_sec=int(
@@ -313,7 +325,7 @@ def build_daily_plan(
             brand=brand,
             pool=pool,
             risk=PolicyRisk(str(pool.get("policy_risk", "LOW"))),
-            character_id=str(pool["character_id"]),
+            characters=_brand_characters(pool),
             prompt_version=prompt_version_default,
             duration_range=duration_range,
             platforms=list(target_platforms),

@@ -2,37 +2,29 @@
 #
 # 市場: 日本を主軸に、海外も狙う → 日本語タグと英語(グローバル)タグを両方混ぜる。
 # 考え方: 「必ず付ける定番（always）」＋「プールから日替わりで数本（pool）」。
-#   always に 日本語コア＋英語コア を両方。pool は 中〜ニッチ を JP/EN 混在で。
+#   always に 日本語コア＋英語コア。pool は 中〜ニッチ を JP/EN 混在で広めに持つ。
 # ★実運用では TikTok Creative Center・YouTube 検索・競合投稿を見て月1で見直す。
 #   learning は本文タグ（concept_tag 等）で回すので、ここはあくまで露出用。
+# ★品種別タグ（#柴犬 / #shibainu / #corgi 等）は publish 時に企画の品種から
+#   自動で1つ足される（publishers.hashtags.breed_tags）。ここには品種横断のタグだけ。
 
 cat:
   youtube:
     always: ["#Shorts", "#猫", "#cat", "#cats"]
-    pool:
-    - '#猫動画'
-    - '#ペット'
-    - '#癒し'
-    - '#猫'
+    pool: ["#子猫", "#kitten", "#かわいい猫", "#cutecat", "#catsofyoutube", "#猫のいる暮らし",
+           "#ねこ", "#癒し", "#funnycats", "#猫動画", "#catlover", "#kittensofyoutube"]
     per_video: 4
   tiktok:
     always: ["#猫", "#cat", "#catsoftiktok", "#fyp"]
-    pool:
-    - '#foryou'
-    - '#猫'
-    - '#ペット'
-    - '#ねこ好きさんと繋がりたい'
-    - '#猫のいる生活'
+    pool: ["#子猫", "#kitten", "#かわいい", "#cutecat", "#foryou", "#foryoupage",
+           "#猫好きさんと繋がりたい", "#catlover", "#funnycat", "#ねこ", "#猫のいる生活",
+           "#kittensoftiktok"]
     per_video: 5
   instagram:
     always: ["#猫", "#cat", "#catstagram", "#catsofinstagram"]
-    pool:
-    - '#猫好き'
-    - '#ねこ'
-    - '#猫との生活'
-    - '#ペット'
-    - '#可愛い'
-    - '#シェア推奨'
+    pool: ["#ねこすたぐらむ", "#子猫", "#kitten", "#kittensofinstagram", "#にゃんすたぐらむ",
+           "#cutecat", "#catlover", "#猫のいる暮らし", "#instacat", "#ペット", "#癒し",
+           "#ねこら部", "#みんねこ"]
     per_video: 6
   x:
     always: ["#猫", "#cat"]
@@ -42,32 +34,22 @@ cat:
 dog:
   youtube:
     always: ["#Shorts", "#犬", "#dog", "#dogs"]
-    pool:
-    - '#犬動画'
-    - '#ペット'
-    - '#癒し'
-    - '#わんこ'
+    pool: ["#子犬", "#puppy", "#かわいい犬", "#cutedog", "#dogsofyoutube", "#犬のいる暮らし",
+           "#いぬ", "#わんこ", "#doglover", "#犬動画", "#puppiesofyoutube", "#funnydogs"]
     per_video: 4
   tiktok:
     always: ["#犬", "#dog", "#dogsoftiktok", "#fyp"]
-    pool:
-    - '#foryou'
-    - '#犬'
-    - '#ペット'
-    - '#わんこ'
-    - '#犬のいる生活'
+    pool: ["#子犬", "#puppy", "#かわいい", "#cutedog", "#foryou", "#foryoupage",
+           "#犬好きさんと繋がりたい", "#doglover", "#funnydog", "#わんこ", "#犬のいる生活",
+           "#puppiesoftiktok"]
     per_video: 5
   instagram:
     always: ["#犬", "#dog", "#dogstagram", "#dogsofinstagram"]
-    pool:
-    - '#犬好き'
-    - '#わんこ'
-    - '#ペット'
-    - '#可愛い'
-    - '#動物'
-    - '#シェア推奨'
+    pool: ["#いぬすたぐらむ", "#子犬", "#puppy", "#puppiesofinstagram", "#わんすたぐらむ",
+           "#cutedog", "#doglover", "#犬のいる暮らし", "#instadog", "#ペット", "#癒し",
+           "#わんこ部", "#ふわもこ部"]
     per_video: 6
   x:
     always: ["#犬", "#dog"]
-    pool: ["#犬好き", "#子犬", "#puppy", "#cutedog", "#かわいい", "#doglover", "#柴犬"]
+    pool: ["#犬好き", "#子犬", "#puppy", "#cutedog", "#かわいい", "#doglover", "#わんこ"]
     per_video: 3

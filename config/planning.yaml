@@ -14,7 +14,10 @@ defaults:
 
 brands:
   cat:
-    character_id: CAT_001
+    # 品種プール（config/characters.yaml のキー）。explore 枠は日替わりで巡回、
+    # exploit 枠は winning_tags の勝ち品種を採用。character_id（単数）でも後方互換。
+    characters: [cat_persian, cat_munchkin, cat_british_shorthair, cat_scottish_fold,
+                 cat_ragdoll, cat_calico, cat_tabby]
     policy_risk: LOW
     concept_tags:
       - "二段オチ"          # 失敗する→と思いきや別の形で成功／もっと変な結果に
@@ -34,7 +37,8 @@ brands:
     oddity_level: [1, 2]            # 基本は自然。「そっくりさん」等だけ 2
 
   dog:
-    character_id: DOG_001
+    characters: [dog_golden_retriever, dog_corgi, dog_pomeranian, dog_french_bulldog,
+                 dog_toy_poodle, dog_shiba, dog_beagle]
     policy_risk: LOW
     concept_tags:
       - "二段オチ"

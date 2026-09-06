@@ -40,6 +40,20 @@ def test_empty_pool_returns_only_always():
     assert select_hashtags("cat", "x", date="2026-09-02", config=CFG) == ["#猫"]
 
 
+def test_breed_tag_is_added_from_character_id():
+    tags = select_hashtags("dog", "instagram", date="2026-09-02",
+                           character_id="dog_shiba", config={"dog": {"instagram": {
+                               "always": ["#犬"], "pool": [], "per_video": 0}}})
+    assert "#柴犬" in tags and "#shibainu" in tags
+
+
+def test_unknown_or_missing_character_id_adds_no_breed_tag():
+    base = {"dog": {"instagram": {"always": ["#犬"], "pool": [], "per_video": 0}}}
+    assert select_hashtags("dog", "instagram", date="d", config=base) == ["#犬"]
+    assert select_hashtags("dog", "instagram", date="d", character_id="dog_unknown",
+                           config=base) == ["#犬"]
+
+
 def test_unknown_brand_or_platform_returns_empty():
     assert select_hashtags("bird", "youtube", date="2026-09-02", config=CFG) == []
     assert select_hashtags("cat", "threads", date="2026-09-02", config=CFG) == []
