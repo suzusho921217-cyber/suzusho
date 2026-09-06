@@ -116,66 +116,48 @@ COORDINATOR_SYSTEM = """\
 - min_posts_for_winner → 「勝ちパターンと判断するのに必要な本数」
 数字の閾値を出すときは「〜なら」と条件を言葉で説明する（記号の羅列にしない）。
 
-★出力は必ず全体で1500字以内。末尾のJSONブロックが切れるのを防ぐため前半を簡潔に。
+★出力形式（厳守）: いきなり ```json のコードブロックを1つだけ出す。前置きの文章・
+後書き・JSON外の文章は一切書かない。各文字列は簡潔に（1〜2文、長くても80字）。
+JSONが長くなりすぎて途中で切れるのを避けるため、冗長な説明を入れない。
 
-出力の前半（日本語、簡潔に。合計1500字以内）:
-1. 結論（1〜2行）: 今ユーザーが取るべき次の一手
-2. 収益化までの進捗: 各アカウントの登録者数・視聴数と、収益化ラインまでの距離を数字で。
-   目安 → YouTube: 登録者1000人 かつ 直近90日のショート視聴1000万回（または長尺の総再生4000時間）。
-   Instagram（日本）: 直接の広告収益プログラムは無い（フォロワーを伸ばして他導線につなぐ前提）。
-   まだ遠いなら「まだR&D段階」と正直に書く。
-3. 各専門役の要点: 意見の相違があればそのまま両論併記（片方に寄せてまとめない）
-4. 優先順位付きアクションリスト: 「今すぐ」「今週中」「様子見でよい」の3段階
-5. 保留・要確認事項
-
-出力の後半には、必ず ```json ... ``` のコードブロックで以下の構造化データを1つ出すこと。
-自動処理がこのJSONだけを抽出して使うので、他の場所にJSONを書かないこと。
-文章はすべて上記のかみ砕いた日本語で書くこと（description も agent_topics も）。
-
+```json
 {
-  "headline": "結論の1行要約",
-  "monetization_progress": "収益化ラインまでの距離を数字つきで2〜4文。まだ遠いなら正直にそう書く",
+  "headline": "結論を1行で（40字以内）",
+  "monetization_progress": "登録者数・視聴数と収益化ラインまでの距離。目安→YouTube:登録者1000人+90日ショート視聴1000万回。Instagram(日本)は直接の広告収益なし。まだ遠ければ『R&D段階』と書く。2〜3文",
   "agent_topics": {
-    "analyst": "分析役からの一番のポイントを1文で",
-    "researcher": "調査役からの一番のポイントを1文で",
-    "marketer": "企画役からの一番のポイントを1文で",
-    "critic": "批判役からの一番のポイントを1文で"
+    "analyst": "分析役の要点1文", "researcher": "調査役の要点1文",
+    "marketer": "企画役の要点1文", "critic": "批判役の要点1文"
   },
   "decision_log": {
     "account": "cat / dog / all",
-    "hypothesis": "今日の仮説（何がどうなると考えるか）",
-    "data_used": "判断に使ったデータ（数字を添える）",
-    "agent_opinions": "各エージェントの主要意見を1〜2文ずつ",
-    "critic_objection": "批判役からの反論",
-    "decision": "最終決定（採用したものだけ。案止まりは書かない）",
+    "hypothesis": "今日の仮説1文", "data_used": "使ったデータ（数字つき）1文",
+    "agent_opinions": "各役の主要意見を各1文", "critic_objection": "批判役の反論1文",
+    "decision": "採用した決定だけ（案止まりは書かない）",
     "changed_vars": "今回変える変数（原則1つ）。無ければ「なし」",
-    "unchanged_vars": "あえて変えない変数とその理由",
-    "expected_kpi": "期待するKPI（例: 最後まで見られた割合が7日平均で上がる）",
-    "success_criteria": "成功と判定する条件 / 失敗と判定する条件",
+    "unchanged_vars": "あえて変えない変数と理由",
+    "expected_kpi": "期待する数字の動き1文", "success_criteria": "成功の条件/失敗の条件",
     "review_date": "YYYY-MM-DD（数日〜1週間後）",
-    "confidence": 0,
-    "data_sufficient": true
+    "confidence": 0, "data_sufficient": true
   },
   "decision_reviews": [
-    {"decision_id": "再評価日が来た過去ログのID", "result": "成功 / 失敗 / 判断保留",
-     "actual_kpi": "実績値", "result_reason": "そう判定した理由"}
+    {"decision_id": "再評価日が来た過去ログのID", "result": "成功/失敗/判断保留",
+     "actual_kpi": "実績値", "result_reason": "理由1文"}
   ],
   "auto_apply": [
-    {"kind": "add_concept_tag", "brand": "cat/dog", "tag": "新しい企画タグ", "reason": "..."},
-    {"kind": "add_hook_type", "brand": "cat/dog", "hook": "新しいフック", "reason": "..."},
-    {"kind": "retire_concept_tag", "brand": "cat/dog", "tag": "伸びない企画タグ", "reason": "..."},
-    {"kind": "retire_hook_type", "brand": "cat/dog", "hook": "伸びないフック", "reason": "..."},
-    {"kind": "set_hashtags", "brand": "cat/dog", "platform": "youtube/instagram",
-     "tags": ["#タグ1", "#タグ2"], "reason": "..."},
-    {"kind": "set_level_range", "brand": "cat/dog", "dimension": "reality/oddity",
-     "min": 4, "max": 5, "reason": "..."},
-    {"kind": "set_allocation_ratio", "exploit": 0.7, "explore": 0.3, "reason": "..."}
+    {"kind": "add_concept_tag|add_hook_type|retire_concept_tag|retire_hook_type",
+     "brand": "cat|dog", "tag": "（tag系）", "hook": "（hook系）", "reason": "1文"},
+    {"kind": "set_hashtags", "brand": "cat|dog", "platform": "youtube|instagram",
+     "tags": ["#a", "#b"], "reason": "1文"},
+    {"kind": "set_level_range", "brand": "cat|dog", "dimension": "reality|oddity",
+     "min": 4, "max": 5, "reason": "1文"},
+    {"kind": "set_allocation_ratio", "exploit": 0.7, "explore": 0.3, "reason": "1文"}
   ],
   "needs_user_approval": [
-    {"description": "お金や規約に絡む提案（かみ砕いた日本語で。1文ずつ句点で区切る）",
+    {"description": "お金や規約に絡む提案。1文ずつ句点で区切る",
      "estimated_cost_jpy_per_month": 0}
   ]
 }
+```
 
 decision_log は毎回必ず1つ出す（何も方針変更しない日は decision を「現状維持」、
 changed_vars を「なし」にする）。decision_reviews は再評価日が来たログが無ければ空配列。

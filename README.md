@@ -148,18 +148,30 @@ mock/dryrun のまま
 
 ## agent-mtg（毎日のエージェントMTG）
 
-`.claude/agents/{analyst,researcher,marketer,critic,coordinator}.md` の5役職をヘッドレスで
-順番に呼び（analyst→researcher→marketer→critic→coordinator）、coordinatorの結論のうち
-**費用・ポリシーが一切絡まない**提案（企画タグ追加／フック種別追加／ハッシュタグ差し替え）
-だけを `config/planning.yaml` `config/hashtags.yaml` に自動反映してコミットする。
-費用・ポリシーが絡む提案は自動実行せず、メールで報告するのみ（判断はユーザー）。
+5役職をヘッドレスで順番に呼び（analyst→researcher→marketer→critic→coordinator）、
+統括（coordinator）が運用方針を決める。統括には**お金・規約に触れない範囲の決定権**がある：
+- 自動反映（`apply.py`）: 企画タグ／フックの追加・引退、ハッシュタグ差し替え、
+  リアリティ/違和感レベルの範囲、活用 vs 探索の比率。いずれも「1日6本・尺・投稿頻度・
+  広告」は一切変えない＝**費用不変**。criticの検証を通ったものだけ。
+- **お金（本数・尺・頻度・広告）と規約**が絡む提案は自動実行せず、メール報告のみ（判断はユーザー）。
 
 ```bash
 python -m src.cli agent-mtg
 ```
 
-- ロジック本体は `src/mtg/`（`roles.py`=各役職のプロンプト、`context.py`=判断材料の収集、
-  `apply.py`=許可された3種類のみ受け付ける安全な反映処理、`orchestrate.py`=全体の流れ）
+### 意思決定ログ
+
+統括は毎日、判断を**スプレッドシート「意思決定ログ」タブ**に1行残す（`orchestrate._save_decisions`）:
+仮説／使ったデータ／各役の意見／批判の反論／最終決定／変える変数（原則1つ）／変えない変数／
+期待KPI／成功失敗の基準／再評価日／確信度(0-100%)／データ十分か。
+
+- 会議の前に「過去14日＋未評価の判断」を材料として渡す（`context.py`）→ 過去の結果を踏まえて決める。
+- 再評価日が来たログは、実績を見て `結果`（成功／失敗／判断保留）＋理由を追記する。
+- 狙い: 「AIが何を判断したか」だけでなく「どの判断がどの条件で正しかったか」を蓄積し、
+  意思決定そのものの精度を上げる。週次レビュー（Phase 3）は未実装。
+
+- ロジック本体は `src/mtg/`（`roles.py`=各役職のプロンプト＋意思決定ルール10項目、
+  `context.py`=判断材料の収集、`apply.py`=安全な反映処理、`orchestrate.py`=全体の流れ）
 - 既定モデルは費用優先で Haiku（`MTG_MODEL` 環境変数で上書き可）
 - GitHub Actions: `.github/workflows/agent_mtg.yml`（毎日 05:37 JST、`daily_learning` の後）
 - 実行には `ANTHROPIC_API_KEY` が必要（`console.anthropic.com` で発行、GitHub Secretsに設定）
@@ -209,8 +221,8 @@ Veo は 1本 **4/6/8 秒のみ**（企画の目標尺以上で最小を自動選
 
 1. ✅ **動画生成API**: Veo に決定。実キーで smoke テスト完了(2026-09-05, plan-daily→generate→poll-generation→実動画DL確認)。
    残: Cloud Console の実請求で `price_jpy_per_sec` を最終確認。extend 非対応の例外処理は未修正(§次項参照)。
-2. ✅ **Google Sheets 3DB**: 完了(2026-09-05)。スプレッドシート1本＋タブ3枚（投稿DB／
-   パフォーマンスDB／アカウント日次DB）、見出しは日本語。専用サービスアカウント
+2. ✅ **Google Sheets DB**: 完了(2026-09-05)。スプレッドシート1本＋タブ4枚（投稿DB／
+   パフォーマンスDB／アカウント日次DB／意思決定ログ）、見出しは日本語。専用サービスアカウント
    `sns-automation-sheets@gen-lang-client-0301308589.iam.gserviceaccount.com` を新規作成
    （鍵は `secrets/sheets-service-account.json`、gitignore済）。`sheets.SheetsStore` 実装済み、
    実シートでのread/write roundtrip確認済み。`.env` の `SHEETS_BACKEND=sheets` で有効化

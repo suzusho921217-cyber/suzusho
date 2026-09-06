@@ -39,6 +39,17 @@ def test_extract_json_returns_none_when_absent():
     assert orchestrate._extract_json("JSONブロックが無い普通の文章") is None
 
 
+def test_extract_json_recovers_from_truncated_block():
+    # max_tokens で閉じ ``` もキーの途中も切れたケース
+    truncated = (
+        '```json\n{"headline": "結論", "confidence": 60, '
+        '"decision_log": {"hypothesis": "途中で切れ'
+    )
+    got = orchestrate._extract_json(truncated)
+    assert got is not None
+    assert got["headline"] == "結論" and got["confidence"] == 60
+
+
 def test_run_calls_five_roles_in_order_with_correct_web_search_flag(monkeypatch):
     calls = []
 

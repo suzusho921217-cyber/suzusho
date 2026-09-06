@@ -20,6 +20,7 @@ from src.mtg.context import STATE_DIR, gather_context
 
 JST = timezone(timedelta(hours=9))
 _JSON_BLOCK_RE = re.compile(r"```json\s*(\{.*?\})\s*```", re.DOTALL)
+_JSON_OPEN_RE = re.compile(r"```json\s*(\{.*)", re.DOTALL)
 
 
 @dataclass
@@ -34,11 +35,54 @@ class MtgResult:
 
 
 def _extract_json(text: str) -> dict | None:
+    """```json ブロックの中身を dict にする。閉じ ``` が無い（max_tokens で切れた）
+    場合でも、先頭の { から `raw_decode` で読めるところまで拾う。"""
     m = _JSON_BLOCK_RE.search(text)
-    if not m:
+    candidates = [m.group(1)] if m else []
+    m2 = _JSON_OPEN_RE.search(text)
+    if m2:
+        candidates.append(m2.group(1).rstrip("` \n"))
+    for cand in candidates:
+        try:
+            return json.loads(cand)
+        except json.JSONDecodeError:
+            pass
+        repaired = _repair_truncated_json(cand)
+        if repaired is not None:
+            return repaired
+    return None
+
+
+def _repair_truncated_json(s: str) -> dict | None:
+    """max_tokens で末尾が切れた JSON を、直近の完全なキー/値まで戻して閉じ括弧を補う。"""
+    depth_stack: list[str] = []
+    in_str = False
+    esc = False
+    last_safe = -1  # 直後で安全に閉じられる位置（トップレベル要素の区切り）
+    for i, ch in enumerate(s):
+        if in_str:
+            if esc:
+                esc = False
+            elif ch == "\\":
+                esc = True
+            elif ch == '"':
+                in_str = False
+            continue
+        if ch == '"':
+            in_str = True
+        elif ch in "{[":
+            depth_stack.append("}" if ch == "{" else "]")
+        elif ch in "}]":
+            if depth_stack:
+                depth_stack.pop()
+        elif ch == "," and len(depth_stack) == 1:
+            last_safe = i  # トップレベル辞書の要素区切り
+    if last_safe < 0:
         return None
+    fixed = s[:last_safe] + "}"
     try:
-        return json.loads(m.group(1))
+        obj = json.loads(fixed)
+        return obj if isinstance(obj, dict) else None
     except json.JSONDecodeError:
         return None
 
@@ -69,7 +113,7 @@ def run() -> MtgResult:
         f"## analyst\n{analyst_out}\n\n## researcher\n{researcher_out}\n\n"
         f"## marketer\n{marketer_out}\n\n## critic\n{critic_out}"
     )
-    coordinator_out = call_role(roles.COORDINATOR_SYSTEM, coordinator_input, max_tokens=4000)
+    coordinator_out = call_role(roles.COORDINATOR_SYSTEM, coordinator_input, max_tokens=8000)
     result.transcripts["coordinator"] = coordinator_out
 
     parsed = _extract_json(coordinator_out)
