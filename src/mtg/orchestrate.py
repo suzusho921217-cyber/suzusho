@@ -28,6 +28,8 @@ class MtgResult:
     transcripts: dict[str, str] = field(default_factory=dict)
     coordinator_json: dict | None = None
     apply_results: list[str] = field(default_factory=list)
+    decision_saved: str | None = None      # 保存した意思決定ログの ID
+    review_results: list[str] = field(default_factory=list)  # 再評価の結果メッセージ
     error: str | None = None
 
 
@@ -78,7 +80,62 @@ def run() -> MtgResult:
 
     auto_apply = parsed.get("auto_apply") or []
     result.apply_results = apply_all(auto_apply)
+
+    try:
+        _save_decisions(result, parsed)
+    except Exception as e:  # noqa: BLE001 - 台帳保存の失敗で会議結果を落とさない
+        result.review_results.append(f"[意思決定ログ] 保存失敗: {e}")
     return result
+
+
+def _save_decisions(result: MtgResult, parsed: dict) -> None:
+    """統括の decision_log を意思決定ログDBに保存し、decision_reviews で過去ログを更新する。"""
+    from src.common.models import DecisionLog
+    from src.sheets.client import get_store
+
+    store = get_store(root=STATE_DIR / "db")
+
+    # 1) 今日の意思決定を1行追加（採用された決定のみ）
+    dl = parsed.get("decision_log") or {}
+    if dl:
+        existing_today = [
+            d for d in store.list_decisions() if d.date == result.date
+        ]
+        did = f"{result.date}-{dl.get('account', 'all')}-{len(existing_today) + 1}"
+        store.upsert_decision(DecisionLog(
+            decision_id=did,
+            date=result.date,
+            account=str(dl.get("account", "all")),
+            hypothesis=str(dl.get("hypothesis", "")),
+            data_used=str(dl.get("data_used", "")),
+            agent_opinions=str(dl.get("agent_opinions", "")),
+            critic_objection=str(dl.get("critic_objection", "")),
+            decision=str(dl.get("decision", "")),
+            changed_vars=str(dl.get("changed_vars", "")),
+            unchanged_vars=str(dl.get("unchanged_vars", "")),
+            expected_kpi=str(dl.get("expected_kpi", "")),
+            success_criteria=str(dl.get("success_criteria", "")),
+            review_date=str(dl.get("review_date", "")),
+            confidence=int(dl.get("confidence") or 0),
+            data_sufficient=bool(dl.get("data_sufficient", True)),
+        ))
+        result.decision_saved = did
+
+    # 2) 再評価: decision_reviews の判定を該当ログに追記
+    by_id = {d.decision_id: d for d in store.list_decisions()}
+    for rv in parsed.get("decision_reviews") or []:
+        target = by_id.get(rv.get("decision_id"))
+        if target is None:
+            result.review_results.append(f"[再評価] 該当ログ無し: {rv.get('decision_id')}")
+            continue
+        target.result = str(rv.get("result", ""))
+        target.result_reason = str(rv.get("result_reason", ""))
+        target.actual_kpi = str(rv.get("actual_kpi", ""))
+        target.reviewed_date = result.date
+        store.upsert_decision(target)
+        result.review_results.append(
+            f"[再評価] {target.decision_id}: {target.result}"
+        )
 
 
 def _write_log(result: MtgResult) -> Path:
@@ -91,6 +148,8 @@ def _write_log(result: MtgResult) -> Path:
                 "transcripts": result.transcripts,
                 "coordinator_json": result.coordinator_json,
                 "apply_results": result.apply_results,
+                "decision_saved": result.decision_saved,
+                "review_results": result.review_results,
                 "error": result.error,
             },
             ensure_ascii=False, indent=2,
@@ -147,6 +206,34 @@ def _email_body(result: MtgResult) -> str:
             f"<ul style='margin:0;padding-left:20px'>{li}</ul>"
         )
 
+    # 今日の意思決定（仮説→実行→理由→KPI→再評価）
+    dl = cj.get("decision_log") or {}
+    if dl and (dl.get("hypothesis") or dl.get("decision")):
+        conf = dl.get("confidence")
+        rows = [
+            ("仮説", dl.get("hypothesis")),
+            ("実行すること", dl.get("decision")),
+            ("変える点", dl.get("changed_vars")),
+            ("期待する効果", dl.get("expected_kpi")),
+            ("成功/失敗の基準", dl.get("success_criteria")),
+            ("再評価日", dl.get("review_date")),
+        ]
+        li = "".join(
+            f"<li><b>{k}</b>：{_paras(v)}</li>" for k, v in rows if v
+        )
+        conf_txt = f"（確信度 {conf}%）" if conf else ""
+        note = "" if dl.get("data_sufficient", True) else " <b>※データ不足</b>"
+        p.append(
+            f"<h3 style='margin:16px 0 4px'>🧪 今日の意思決定{esc(conf_txt)}{note}</h3>"
+            f"<ul style='margin:0;padding-left:20px'>{li}</ul>"
+        )
+    if result.review_results:
+        li = "".join(f"<li>{esc(str(r))}</li>" for r in result.review_results)
+        p.append(
+            "<h3 style='margin:16px 0 4px'>📅 過去の判断の再評価</h3>"
+            f"<ul style='margin:0;padding-left:20px'>{li}</ul>"
+        )
+
     # 2. 収益化までの進捗
     if cj.get("monetization_progress"):
         p.append(
@@ -199,7 +286,8 @@ def run_and_report() -> MtgResult:
         subject += f" - {result.coordinator_json.get('headline', '')[:40]}"
     sent = send_alert_email(subject, _email_body(result), html=True)
     print(f"[agent-mtg] メール送信: {'成功' if sent else '失敗/未設定'}")
-    if result.apply_results:
-        for r in result.apply_results:
-            print(f"[agent-mtg] {r}")
+    if result.decision_saved:
+        print(f"[agent-mtg] 意思決定ログ保存: {result.decision_saved}")
+    for r in result.apply_results + result.review_results:
+        print(f"[agent-mtg] {r}")
     return result

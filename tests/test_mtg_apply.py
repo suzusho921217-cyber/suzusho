@@ -14,7 +14,11 @@ from src.mtg.apply import (
     apply_add_concept_tag,
     apply_add_hook_type,
     apply_all,
+    apply_retire_concept_tag,
+    apply_retire_hook_type,
+    apply_set_allocation_ratio,
     apply_set_hashtags,
+    apply_set_level_range,
 )
 
 _REAL_CONFIG_DIR = apply_module.CONFIG_DIR
@@ -26,6 +30,7 @@ def config_dir(tmp_path, monkeypatch):
     d.mkdir()
     shutil.copy(_REAL_CONFIG_DIR / "planning.yaml", d / "planning.yaml")
     shutil.copy(_REAL_CONFIG_DIR / "hashtags.yaml", d / "hashtags.yaml")
+    shutil.copy(_REAL_CONFIG_DIR / "scoring.yaml", d / "scoring.yaml")
     monkeypatch.setattr(apply_module, "CONFIG_DIR", d)
     return d
 
@@ -79,6 +84,53 @@ def test_set_hashtags_rejects_tags_without_hash_prefix(config_dir):
 def test_set_hashtags_rejects_unknown_platform(config_dir):
     with pytest.raises(ApplyError):
         apply_set_hashtags("cat", "facebook", ["#a"])
+
+
+def test_retire_concept_tag_removes_but_keeps_minimum(config_dir):
+    data = _load(config_dir / "planning.yaml")
+    tags = list(data["brands"]["dog"]["concept_tags"])
+    assert apply_retire_concept_tag("dog", tags[0]).startswith("[applied]")
+    assert tags[0] not in _load(config_dir / "planning.yaml")["brands"]["dog"]["concept_tags"]
+    # 最低数まで減ったら削らない
+    d2 = _load(config_dir / "planning.yaml")
+    while len(d2["brands"]["dog"]["concept_tags"]) > 3:
+        apply_retire_concept_tag("dog", d2["brands"]["dog"]["concept_tags"][0])
+        d2 = _load(config_dir / "planning.yaml")
+    with pytest.raises(ApplyError):
+        apply_retire_concept_tag("dog", d2["brands"]["dog"]["concept_tags"][0])
+
+
+def test_retire_hook_type_missing_is_skip(config_dir):
+    assert "[skip]" in apply_retire_hook_type("cat", "存在しないフック")
+
+
+def test_set_level_range_validates(config_dir):
+    assert apply_set_level_range("cat", "oddity", 2, 4).startswith("[applied]")
+    assert _load(config_dir / "planning.yaml")["brands"]["cat"]["oddity_level"] == [2, 4]
+    with pytest.raises(ApplyError):
+        apply_set_level_range("cat", "reality", 3, 9)      # 5超え
+    with pytest.raises(ApplyError):
+        apply_set_level_range("cat", "reality", 5, 2)      # min>max
+    with pytest.raises(ApplyError):
+        apply_set_level_range("cat", "bogus", 1, 2)        # 未知の軸
+
+
+def test_set_allocation_ratio_validates_sum_and_bounds(config_dir):
+    assert apply_set_allocation_ratio(0.6, 0.4).startswith("[applied]")
+    a = _load(config_dir / "scoring.yaml")["allocation"]
+    assert a["exploit_ratio"] == 0.6 and a["explore_ratio"] == 0.4
+    with pytest.raises(ApplyError):
+        apply_set_allocation_ratio(0.6, 0.3)     # 合計1でない
+    with pytest.raises(ApplyError):
+        apply_set_allocation_ratio(0.95, 0.05)   # exploit 上限0.9超え
+
+
+def test_apply_all_still_rejects_money_kinds(config_dir):
+    results = apply_all([
+        {"kind": "set_daily_slots", "count": 20},         # 本数=お金 → 許可外
+        {"kind": "set_video_duration", "seconds": 30},    # 尺=お金 → 許可外
+    ])
+    assert all("[rejected]" in r for r in results)
 
 
 def test_apply_all_rejects_unknown_kind(config_dir):

@@ -11,11 +11,12 @@ from __future__ import annotations
 
 import json
 from dataclasses import asdict
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from src.common.config import load
 from src.common.models import PostStatus
-from src.sheets.client import get_store
+from src.sheets.client import decision_to_row, get_store
 
 STATE_DIR = Path(__file__).resolve().parents[2] / ".state"
 
@@ -87,4 +88,25 @@ def gather_context() -> str:
     budget = load("budget")
     parts.append("## config/budget.yaml（予算上限。この上限を超える提案はしない）\n" + json.dumps(budget, ensure_ascii=False, indent=2))
 
+    parts.append("## 意思決定ログ（過去14日 + 未評価の判断）\n" + _decision_log_summary(store))
+
     return "\n\n".join(parts)
+
+
+def _decision_log_summary(store) -> str:
+    """統括が「過去の判断」を踏まえて決めるための材料（ルール3・4・9）。"""
+    try:
+        decisions = store.list_decisions()
+    except Exception:  # noqa: BLE001 - タブ未作成など。会議は止めない
+        return "まだ意思決定ログが無い（初回）"
+    if not decisions:
+        return "まだ意思決定ログが無い（初回）"
+    today = datetime.now(timezone(timedelta(hours=9))).date()
+    cutoff = (today - timedelta(days=14)).isoformat()
+    keep = [
+        d for d in decisions
+        if d.date >= cutoff or not d.result  # 直近14日 or 未評価
+    ]
+    keep.sort(key=lambda d: d.date, reverse=True)
+    rows = [decision_to_row(d) for d in keep[:30]]
+    return json.dumps(rows, ensure_ascii=False, indent=2)[:6000]

@@ -7,6 +7,7 @@ import pytest
 from src.common.models import (
     AccountDaily,
     Brand,
+    DecisionLog,
     PerformanceSnapshot,
     Platform,
     PolicyDecision,
@@ -15,6 +16,9 @@ from src.common.models import (
 )
 from src.sheets.client import (
     _ACCOUNT_HEADERS_JA as ACCOUNT_HEADERS_JA,
+)
+from src.sheets.client import (
+    _DECISION_HEADERS_JA as DECISION_HEADERS_JA,
 )
 from src.sheets.client import (
     _POST_HEADERS_JA as POST_HEADERS_JA,
@@ -222,6 +226,46 @@ def _fake_store(tabs=None):
 _POST_HEADER_JA = list(POST_HEADERS_JA.values())
 _SNAPSHOT_HEADER_JA = list(SNAPSHOT_HEADERS_JA.values())
 _ACCOUNT_HEADER_JA = list(ACCOUNT_HEADERS_JA.values())
+_DECISION_HEADER_JA = list(DECISION_HEADERS_JA.values())
+
+
+def _decision(did="2026-09-06-cat-1", **kw):
+    base = {
+        "decision_id": did, "date": "2026-09-06", "account": "cat",
+        "hypothesis": "いきなりドアップの方が最後まで見られる",
+        "data_used": "7日平均で完視聴率+5pt", "agent_opinions": "分析役: 傾向あり",
+        "critic_objection": "サンプル数がまだ少ない", "decision": "cat のフックをドアップ寄りに",
+        "changed_vars": "フック配分", "unchanged_vars": "尺・本数",
+        "expected_kpi": "完視聴率7日平均+3pt",
+        "success_criteria": "3日後に+3pt超なら成功", "review_date": "2026-09-09",
+        "confidence": 55, "data_sufficient": True,
+    }
+    base.update(kw)
+    return DecisionLog(**base)
+
+
+def test_local_store_decision_roundtrip(tmp_path):
+    store = LocalStore(tmp_path)
+    store.upsert_decision(_decision())
+    got = store.list_decisions()
+    assert len(got) == 1 and got[0] == _decision()
+    # 同じ ID で上書き（再評価の追記）
+    store.upsert_decision(_decision(result="成功", result_reason="+4pt", reviewed_date="2026-09-09"))
+    got2 = store.list_decisions()
+    assert len(got2) == 1 and got2[0].result == "成功"
+
+
+def test_sheets_store_decision_roundtrip_and_upsert():
+    tabs = {"意思決定ログ": [_DECISION_HEADER_JA]}
+    store = _fake_store(tabs)
+    store.upsert_decision(_decision(confidence=55))
+    store.upsert_decision(_decision(result="失敗", result_reason="変化なし"))
+    assert len(tabs["意思決定ログ"]) == 2  # 見出し + 1行（上書き）
+    got = store.list_decisions()
+    assert len(got) == 1
+    assert got[0].confidence == 55
+    assert got[0].result == "失敗"
+    assert got[0].data_sufficient is True
 
 
 def test_sheets_header_row_found_even_with_summary_block_above():

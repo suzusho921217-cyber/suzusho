@@ -198,6 +198,35 @@ class AccountDaily:
     status: str = "ACTIVE"          # ACTIVE / HOLD / STOP
 
 
+@dataclass
+class DecisionLog:
+    """agent-mtg の統括が毎日残す「意思決定ログ」。1 判断 = 1 行。
+
+    日々の戦略変更とその結果を蓄積し、「どの判断が、どの条件下で、どの程度の確率で
+    成功したか」を学習材料にするための台帳（スプレッドシート「意思決定ログ」タブ）。
+    """
+    decision_id: str               # 一意キー: <date>-<account>-<連番>
+    date: str                      # 日付（会議日）
+    account: str                   # 対象アカウント（cat / dog / all）
+    hypothesis: str                # 仮説
+    data_used: str                 # 判断に使用したデータ
+    agent_opinions: str            # 各エージェントの主要意見
+    critic_objection: str          # 批判エージェントからの反論
+    decision: str                  # 最終決定（会議で出ただけの案とは区別）
+    changed_vars: str              # 変更する変数（原則 1 つ）
+    unchanged_vars: str            # 変更しない変数
+    expected_kpi: str              # 期待する KPI
+    success_criteria: str          # 成功 / 失敗の判定基準
+    review_date: str               # 再評価日
+    confidence: int = 0            # 意思決定の確信度 0〜100（%）
+    data_sufficient: bool = True   # データ不足なら False（無理に方針変更しない）
+    # 以下、再評価日に埋める（それまで空）:
+    result: str = ""               # 成功 / 失敗 / 判断保留
+    result_reason: str = ""        # そう判定した理由
+    actual_kpi: str = ""           # 実績値
+    reviewed_date: str = ""        # 実際に再評価した日
+
+
 # --- 配分（§11 学習・自動配分）------------------------------------------
 
 @dataclass

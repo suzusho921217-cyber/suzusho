@@ -11,17 +11,22 @@ from src.mtg import orchestrate
 
 
 @pytest.fixture(autouse=True)
-def _no_network(monkeypatch):
+def _no_network(monkeypatch, tmp_path):
     monkeypatch.setattr(orchestrate, "gather_context", lambda: "CONTEXT")
     monkeypatch.setattr(orchestrate, "send_alert_email", lambda subject, body, **kw: True)
+    monkeypatch.setattr(orchestrate, "STATE_DIR", tmp_path)  # 意思決定ログを実DBに書かせない
 
 
-def _coordinator_text(auto_apply=None, needs_approval=None):
+def _coordinator_text(auto_apply=None, needs_approval=None, decision_log=None, reviews=None):
     payload = {
         "headline": "テスト結論",
         "auto_apply": auto_apply or [],
         "needs_user_approval": needs_approval or [],
     }
+    if decision_log is not None:
+        payload["decision_log"] = decision_log
+    if reviews is not None:
+        payload["decision_reviews"] = reviews
     return f"統括の報告文\n\n```json\n{json.dumps(payload, ensure_ascii=False)}\n```"
 
 
@@ -117,3 +122,41 @@ def test_run_and_report_writes_log_and_sends_email(tmp_path, monkeypatch):
     # 本文は要点のみの HTML（結論 headline を含む・全文の議事録は含めない）
     assert sent["kw"].get("html") is True
     assert "<h2" in sent["body"] and "テスト結論" in sent["body"]
+
+
+def test_decision_log_is_saved_and_reviewed(tmp_path, monkeypatch):
+    from src.sheets.client import LocalStore
+
+    monkeypatch.setattr(orchestrate, "STATE_DIR", tmp_path)
+    store = LocalStore(tmp_path / "db")
+
+    # 1回目: decision_log を保存
+    dl = {
+        "account": "cat", "hypothesis": "ドアップの方が見られる", "decision": "cat をドアップ寄りに",
+        "changed_vars": "フック配分", "expected_kpi": "完視聴率+3pt",
+        "success_criteria": "3日後+3ptで成功", "review_date": "2026-09-09", "confidence": 60,
+    }
+    monkeypatch.setattr(orchestrate, "call_role", lambda system, content, **kw: (
+        _coordinator_text(decision_log=dl) if system is orchestrate.roles.COORDINATOR_SYSTEM else "出力"
+    ))
+    monkeypatch.setattr(orchestrate, "apply_all", lambda items: [])
+    r1 = orchestrate.run()
+    saved = store.list_decisions()
+    assert len(saved) == 1
+    did = saved[0].decision_id
+    assert r1.decision_saved == did
+    assert saved[0].confidence == 60 and saved[0].result == ""
+
+    # 2回目: その判断を再評価（成功判定）
+    monkeypatch.setattr(orchestrate, "call_role", lambda system, content, **kw: (
+        _coordinator_text(
+            decision_log={"account": "cat", "hypothesis": "続き", "decision": "現状維持",
+                          "changed_vars": "なし", "review_date": "2026-09-12"},
+            reviews=[{"decision_id": did, "result": "成功", "actual_kpi": "+4pt",
+                      "result_reason": "基準超え"}],
+        ) if system is orchestrate.roles.COORDINATOR_SYSTEM else "出力"
+    ))
+    r2 = orchestrate.run()
+    assert any("成功" in m for m in r2.review_results)
+    reviewed = {d.decision_id: d for d in store.list_decisions()}[did]
+    assert reviewed.result == "成功" and reviewed.actual_kpi == "+4pt"

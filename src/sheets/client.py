@@ -25,6 +25,7 @@ from src.common.config import env
 from src.common.models import (
     AccountDaily,
     Brand,
+    DecisionLog,
     PerformanceSnapshot,
     Platform,
     PolicyDecision,
@@ -161,6 +162,43 @@ def _account_key(a: AccountDaily) -> str:
     return f"{a.date}|{a.brand.value}|{a.platform.value}|{a.account_id}"
 
 
+_DECISION_FIELDS = (
+    "decision_id", "date", "account", "hypothesis", "data_used", "agent_opinions",
+    "critic_objection", "decision", "changed_vars", "unchanged_vars", "expected_kpi",
+    "success_criteria", "review_date", "confidence", "data_sufficient",
+    "result", "result_reason", "actual_kpi", "reviewed_date",
+)
+
+
+def decision_to_row(d: DecisionLog) -> dict:
+    return {f: getattr(d, f) for f in _DECISION_FIELDS}
+
+
+def decision_from_row(r: dict) -> DecisionLog:
+    return DecisionLog(
+        decision_id=str(r.get("decision_id", "")),
+        date=str(r.get("date", "")),
+        account=str(r.get("account", "")),
+        hypothesis=str(r.get("hypothesis", "") or ""),
+        data_used=str(r.get("data_used", "") or ""),
+        agent_opinions=str(r.get("agent_opinions", "") or ""),
+        critic_objection=str(r.get("critic_objection", "") or ""),
+        decision=str(r.get("decision", "") or ""),
+        changed_vars=str(r.get("changed_vars", "") or ""),
+        unchanged_vars=str(r.get("unchanged_vars", "") or ""),
+        expected_kpi=str(r.get("expected_kpi", "") or ""),
+        success_criteria=str(r.get("success_criteria", "") or ""),
+        review_date=str(r.get("review_date", "") or ""),
+        confidence=int(r.get("confidence") or 0),
+        data_sufficient=bool(r.get("data_sufficient", True))
+        if r.get("data_sufficient") not in (None, "") else True,
+        result=str(r.get("result", "") or ""),
+        result_reason=str(r.get("result_reason", "") or ""),
+        actual_kpi=str(r.get("actual_kpi", "") or ""),
+        reviewed_date=str(r.get("reviewed_date", "") or ""),
+    )
+
+
 # --- インターフェース ------------------------------------------------------
 
 class Store(abc.ABC):
@@ -195,6 +233,13 @@ class Store(abc.ABC):
 
     @abc.abstractmethod
     def list_account_daily(self) -> list[AccountDaily]: ...
+
+    @abc.abstractmethod
+    def upsert_decision(self, row: DecisionLog) -> None:
+        """意思決定ログを 1 行。decision_id 一致で上書き、無ければ追加。"""
+
+    @abc.abstractmethod
+    def list_decisions(self) -> list[DecisionLog]: ...
 
 
 class LocalStore(Store):
@@ -270,6 +315,15 @@ class LocalStore(Store):
     def list_account_daily(self) -> list[AccountDaily]:
         return [account_daily_from_row(r) for r in self._read("account_daily.json", {}).values()]
 
+    # 意思決定ログ — decision_id の dict
+    def upsert_decision(self, row: DecisionLog) -> None:
+        data = self._read("decisions.json", {})
+        data[row.decision_id] = decision_to_row(row)
+        self._write("decisions.json", data)
+
+    def list_decisions(self) -> list[DecisionLog]:
+        return [decision_from_row(r) for r in self._read("decisions.json", {}).values()]
+
 
 def _smart_num(v: str) -> int | float | str:
     """Sheets のセル文字列を int/float に。数値でなければそのまま返す。"""
@@ -324,6 +378,21 @@ _ACCOUNT_HEADERS_JA = {
 }
 _ACCOUNT_NUMERIC = {"followers", "daily_views", "daily_posts", "daily_revenue_jpy",
                      "daily_api_cost_jpy", "warnings"}
+
+# 意思決定ログ（agent-mtg 統括が毎日残す台帳）
+_DECISION_HEADERS_JA = {
+    "decision_id": "判断ID", "date": "日付", "account": "対象", "hypothesis": "仮説",
+    "data_used": "使ったデータ", "agent_opinions": "各エージェントの意見",
+    "critic_objection": "批判エージェントの反論", "decision": "最終決定",
+    "changed_vars": "変える変数", "unchanged_vars": "変えない変数",
+    "expected_kpi": "期待KPI", "success_criteria": "成功/失敗の基準",
+    "review_date": "再評価日", "confidence": "確信度", "data_sufficient": "データ",
+    "result": "結果", "result_reason": "結果の理由", "actual_kpi": "実績値",
+    "reviewed_date": "再評価した日",
+}
+_DECISION_NUMERIC = {"confidence"}
+_DECISION_UNITS = {"confidence": "%"}
+_DECISION_VALUE_MAPS = {"data_sufficient": {True: "十分", False: "不足"}}
 _ACCOUNT_UNITS = {
     "followers": "人", "daily_views": "回", "daily_posts": "件",
     "daily_revenue_jpy": "円", "daily_api_cost_jpy": "円", "warnings": "件",
@@ -408,6 +477,7 @@ class SheetsStore(Store):
     _TAB_POST = "投稿DB"
     _TAB_SNAPSHOT = "パフォーマンスDB"
     _TAB_ACCOUNT = "アカウント日次DB"
+    _TAB_DECISION = "意思決定ログ"
 
     def __init__(
         self, spreadsheet_id: str | None = None,
@@ -676,6 +746,27 @@ class SheetsStore(Store):
             _ACCOUNT_VALUE_MAPS, None, _ACCOUNT_UNITS,
         )
         return [account_daily_from_row(d) for _, d in rows]
+
+    def upsert_decision(self, row: DecisionLog) -> None:
+        _, rows = self._rows_with_index(
+            self._TAB_DECISION, _DECISION_HEADERS_JA, _DECISION_NUMERIC,
+            _DECISION_VALUE_MAPS, None, _DECISION_UNITS,
+        )
+        match = next(
+            (i for i, d in rows if d.get("decision_id") == row.decision_id), None
+        )
+        self._upsert_row(
+            self._TAB_DECISION, _DECISION_HEADERS_JA, _DECISION_NUMERIC,
+            decision_to_row(row), match_row_number=match,
+            value_maps=_DECISION_VALUE_MAPS, units=_DECISION_UNITS,
+        )
+
+    def list_decisions(self) -> list[DecisionLog]:
+        _, rows = self._rows_with_index(
+            self._TAB_DECISION, _DECISION_HEADERS_JA, _DECISION_NUMERIC,
+            _DECISION_VALUE_MAPS, None, _DECISION_UNITS,
+        )
+        return [decision_from_row(d) for _, d in rows]
 
 
 def get_store(*, backend: str | None = None, root: Path | str | None = None) -> Store:
