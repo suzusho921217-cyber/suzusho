@@ -62,7 +62,7 @@ AIショートメディア完全自動運用基盤（設計書 v1.0 の実装）
 ## ディレクトリ
 
 ```
-.github/workflows/   スケジュール別 9本 + ci.yml + _reusable.yml（§5）
+.github/workflows/   パイプライン各工程 + agent_mtg + strategy_review + manual_refresh + ci + _reusable（§5）
 src/
   cli.py             GitHub Actions からの単一エントリポイント（前後で state_sync が働く）
   common/            models.py（§6§10）/ config.py / guardrails.py（§13§14）/ state_sync.py（§15）
@@ -168,13 +168,39 @@ python -m src.cli agent-mtg
 - 会議の前に「過去14日＋未評価の判断」を材料として渡す（`context.py`）→ 過去の結果を踏まえて決める。
 - 再評価日が来たログは、実績を見て `結果`（成功／失敗／判断保留）＋理由を追記する。
 - 狙い: 「AIが何を判断したか」だけでなく「どの判断がどの条件で正しかったか」を蓄積し、
-  意思決定そのものの精度を上げる。週次レビュー（Phase 3）は未実装。
+  意思決定そのものの精度を上げる。意思決定ログの週次レビュー（Phase 3）は未実装
+  （事業視点の週次レビューは別途 `strategy-review` にある。下記）。
 
 - ロジック本体は `src/mtg/`（`roles.py`=各役職のプロンプト＋意思決定ルール10項目、
   `context.py`=判断材料の収集、`apply.py`=安全な反映処理、`orchestrate.py`=全体の流れ）
 - 既定モデルは費用優先で Haiku（`MTG_MODEL` 環境変数で上書き可）
 - GitHub Actions: `.github/workflows/agent_mtg.yml`（毎日 05:37 JST、`daily_learning` の後）
 - 実行には `ANTHROPIC_API_KEY` が必要（`console.anthropic.com` で発行、GitHub Secretsに設定）
+
+## strategy-review（週次の経営企画レビュー）
+
+日次の agent-mtg が「日々の運用最適化」なのに対し、これは **四半期〜年の視点で
+「事業として収益化に向かっているか / どこに寄せるか / 続けるか」** を週1で見る。
+
+```bash
+python -m src.cli strategy-review
+```
+
+- 経営企画役（`roles.STRATEGIST_SYSTEM`）を1回だけ呼ぶ（Web検索ON。既定 Haiku、
+  ワークフローでは `MTG_MODEL=claude-sonnet-5`）。
+- 見る材料: `config/monetization.yaml`（各媒体の収益化条件・動画以外の収益経路・現在の役割）、
+  各媒体の現在地（フォロワー・累計再生・投稿本数・運用日数を `src/strategy/review.py` が集計）、
+  `docs/economics.md`、`docs/monetization_roadmap.md`、予算消化、直近の意思決定ログ。
+- 出すもの: 各媒体の収益化ラインまでの距離・到達見込み時期、期限イベント警告
+  （例: 2027-02-01 の YouTube 本収益化の基準倍増）、案件・アフィリ等の動画外収益の現実性、
+  リソース配分、継続/縮小/撤退シグナル。
+- **権限は `docs/monetization_roadmap.md` の「週次所見」欄（`<!-- WEEKLY:START -->`〜`END`）の
+  更新とメール報告のみ。** config・コード・予算・投稿内容は変えない。お金・規約・
+  フォーマット変更・媒体追加に絡む提案は `needs_user_approval` としてメールで報告するだけ
+  （判断はユーザー）。
+- GitHub Actions: `.github/workflows/strategy_review.yml`（毎週月曜 06:20 JST）。
+  所見が更新されたら `docs/monetization_roadmap.md` を bot がコミットする。
+- 対話版は `.claude/agents/strategist.md`。
 
 ## シークレット（§5）
 
