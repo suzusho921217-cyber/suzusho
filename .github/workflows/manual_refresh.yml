@@ -1,0 +1,23 @@
+# スプレッドシートの「🔄 更新」ボタン（GAS）から手動で叩く用。
+# お金のかかる生成・投稿はせず、数字の回収（metrics）と学習（daily-learning）だけ回す。
+# 生成や投稿まで手動でやりたいときは各ワークフローの「Run workflow」を個別に押す。
+name: manual_refresh
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: sns-pipeline-state
+  cancel-in-progress: false
+
+jobs:
+  metrics:
+    uses: ./.github/workflows/_reusable.yml
+    with:
+      command: metrics
+    secrets: inherit
+  learn:
+    needs: metrics
+    uses: ./.github/workflows/_reusable.yml
+    with:
+      command: daily-learning
+    secrets: inherit
