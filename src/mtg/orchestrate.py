@@ -100,24 +100,64 @@ def _write_log(result: MtgResult) -> Path:
     return path
 
 
+_ROLE_LABELS = {
+    "analyst": "📊 分析役",
+    "researcher": "🔎 調査役",
+    "marketer": "💡 企画役",
+    "critic": "🧐 批判役",
+}
+
+
+def _paras(text: str) -> str:
+    """長い文を句点で改行して読みやすくする（HTML）。末尾の（…）は前の文にくっつける。"""
+    import html as _html
+
+    s = _html.escape(str(text)).strip()
+    # 「。」の後で改行（ただし閉じ括弧・閉じ鉤括弧が続く場合は割らない）
+    s = s.replace("。", "。<br>").replace("。<br>）", "。）").replace("。<br>」", "。」")
+    return s.removesuffix("<br>")
+
+
 def _email_body(result: MtgResult) -> str:
     """要点だけの HTML 本文。各役職の全文・統括レポートは .state/mtg-<date>.json に残す。"""
     import html as _html
 
     esc = _html.escape
     cj = result.coordinator_json or {}
-    p: list[str] = [f"<h2 style='margin:0 0 8px'>エージェントMTG {esc(result.date)}</h2>"]
+    p: list[str] = [
+        "<div style='font-size:14px;line-height:1.7'>",
+        f"<h2 style='margin:0 0 10px'>🗓️ エージェントMTG {esc(result.date)}</h2>",
+    ]
 
     if result.error:
-        p.append(f"<p>⚠ {esc(result.error)}</p>")
+        p.append(f"<p>⚠️ {esc(result.error)}</p>")
     if cj.get("headline"):
-        p.append(f"<p><b>結論:</b> {esc(str(cj['headline']))}</p>")
+        p.append(
+            "<p style='background:#f4f6f8;padding:10px 12px;border-radius:6px'>"
+            f"<b>📋 結論</b><br>{_paras(cj['headline'])}</p>"
+        )
+
+    topics = cj.get("agent_topics") or {}
+    if topics:
+        li = "".join(
+            f"<li><b>{_ROLE_LABELS.get(k, k)}</b>：{_paras(topics[k])}</li>"
+            for k in ("analyst", "researcher", "marketer", "critic")
+            if topics.get(k)
+        )
+        if li:
+            p.append(
+                "<h3 style='margin:16px 0 4px'>🤖 各エージェントのポイント</h3>"
+                f"<ul style='margin:0;padding-left:20px'>{li}</ul>"
+            )
 
     if result.apply_results:
         li = "".join(f"<li>{esc(str(r))}</li>" for r in result.apply_results)
-        p.append(f"<h3 style='margin:12px 0 4px'>自動反映した変更</h3><ul>{li}</ul>")
+        p.append(
+            "<h3 style='margin:16px 0 4px'>✅ 自動反映した変更</h3>"
+            f"<ul style='margin:0;padding-left:20px'>{li}</ul>"
+        )
     else:
-        p.append("<p style='color:#666'>自動反映した変更: なし</p>")
+        p.append("<p style='color:#666;margin:16px 0 0'>✅ 自動反映した変更：なし</p>")
 
     needs = cj.get("needs_user_approval") or []
     if needs:
@@ -125,15 +165,18 @@ def _email_body(result: MtgResult) -> str:
         for it in needs:
             cost = it.get("estimated_cost_jpy_per_month", 0) or 0
             li += (
-                f"<li>{esc(str(it.get('description', '')))}"
-                f" <span style='color:#888'>（月額目安 ¥{cost:,.0f}）</span></li>"
+                f"<li style='margin-bottom:8px'>{_paras(it.get('description', ''))}"
+                f"<br><span style='color:#888'>（月額目安 ¥{cost:,.0f}）</span></li>"
             )
-        p.append(f"<h3 style='margin:12px 0 4px'>要ユーザー承認（未実行）</h3><ul>{li}</ul>")
+        p.append(
+            "<h3 style='margin:16px 0 4px'>⚠️ 要ユーザー承認（未実行）</h3>"
+            f"<ul style='margin:0;padding-left:20px'>{li}</ul>"
+        )
 
     p.append(
-        "<p style='color:#999;font-size:12px;margin-top:16px'>"
-        f"各役職の全文・統括レポートは .state/mtg-{esc(result.date)}.json"
-        " / GitHub Actions のログ</p>"
+        "<p style='color:#999;font-size:12px;margin-top:18px'>"
+        f"📄 各役職の全文・統括レポートは .state/mtg-{esc(result.date)}.json"
+        " / GitHub Actions のログ</p></div>"
     )
     return "".join(p)
 
