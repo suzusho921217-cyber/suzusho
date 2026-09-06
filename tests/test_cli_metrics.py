@@ -102,38 +102,32 @@ def test_metrics_daily_delta_is_vs_prev_day_not_prev_run(tmp_path, monkeypatch):
     assert todays.followers == 120
 
 
-def test_metrics_aggregates_daily_account_stats(tmp_path, monkeypatch):
+def test_metrics_account_daily_records_followers_and_guard_status(tmp_path, monkeypatch):
+    """スリム化後のアカウント日次DB: フォロワー数と guard 状態だけを日次で残す。"""
     monkeypatch.setattr(cli_module, "STATE_DIR", tmp_path)
     monkeypatch.setattr(cli_module, "get_publisher", lambda platform, brand=None: _FakeAccountPublisher())
 
-    # cmd_metrics 側の「今日」判定はJST基準なので、テストの published_at もJSTで揃える
-    # （UTCのままだとJST日付境界(0-9時)の実行だけ日付がズレて落ちる）。
     today = datetime.now(_JST)
     store = LocalStore(tmp_path / "db")
-    for i in range(2):
-        store.upsert_post(Post(
-            post_key=f"p{i}:youtube", master_video_id=f"p{i}", brand=Brand.DOG,
-            platform=Platform.YOUTUBE, account_id="dog-youtube", concept_tag="c",
-            hook_type="h", character_id="DOG_001", duration_sec=8, oddity_level=1,
-            prompt_version="v1", generation_cost_jpy=32.0, policy_version="v1",
-            policy_result=PolicyDecision.PASS, status=PostStatus.PUBLISHED,
-            published_at=today, platform_post_id=f"yt-{i}",
-        ))
+    store.upsert_post(Post(
+        post_key="p0:youtube", master_video_id="p0", brand=Brand.DOG,
+        platform=Platform.YOUTUBE, account_id="dog-youtube", concept_tag="c",
+        hook_type="h", character_id="DOG_001", duration_sec=8, oddity_level=1,
+        prompt_version="v1", generation_cost_jpy=32.0, policy_version="v1",
+        policy_result=PolicyDecision.PASS, status=PostStatus.PUBLISHED,
+        published_at=today, platform_post_id="yt-0",
+    ))
     (tmp_path / "guard.json").write_text(json.dumps({
         "targets": [{"brand": "dog", "platform": "youtube", "action": "HOLD",
                      "reasons": ["媒体警告が連続"]}],
     }), encoding="utf-8")
 
-    rc = main(["metrics"])
-    assert rc == 0
+    assert main(["metrics"]) == 0
 
     rows = [a for a in store.list_account_daily() if a.account_id == "dog-youtube"]
     row = max(rows, key=lambda a: a.date)
-    assert row.daily_posts == 2
-    assert row.daily_views == 1000  # 500 views × 2投稿
-    assert row.daily_api_cost_jpy == 64.0  # 32円 × 2投稿
-    assert row.warnings == 1
-    assert row.status == "HOLD"
+    assert row.followers == 120           # _FakeAccountPublisher が返す現在値
+    assert row.status == "HOLD"           # guard.json 由来
 
 
 def test_full_loop_metrics_to_performance_mode_plan(published):

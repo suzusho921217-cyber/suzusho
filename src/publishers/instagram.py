@@ -37,8 +37,24 @@ _AI_DISCLOSURE_NOTE = "※この動画にはAIで生成・加工された合成�
 _ZWS = "\u200b"  # ゼロ幅スペース。視聴者には見えないがテキストとしては存在する
 
 
+_ZW1 = "‌"  # ZERO WIDTH NON-JOINER
+_MARKER_BITS = 40  # sha1 の先頭 40bit。衝突確率は実用上ゼロ
+
+
+def _marker_bits(post_key: str) -> str:
+    import hashlib
+
+    h = int.from_bytes(hashlib.sha1(post_key.encode()).digest()[:8], "big")
+    return format(h, "064b")[-_MARKER_BITS:]
+
+
 def _idempotency_marker(post: Post) -> str:
-    return f"{_ZWS}{_ZWS}pk:{post.post_key}{_ZWS}"
+    """post_key を復元不能・完全不可視な目印にする（キャプション末尾に追記）。
+
+    「pk:...」の生テキストは普通に見えてしまうので、post_key のハッシュを 2 種類の
+    ゼロ幅文字（ZWSP=0 / ZWNJ=1）の並びで表現する。
+    """
+    return "".join(_ZW1 if b == "1" else _ZWS for b in _marker_bits(post.post_key))
 
 
 class InstagramPublisher(Publisher):
@@ -70,7 +86,7 @@ class InstagramPublisher(Publisher):
         return PublishResult(ok=True, platform_post_id=media_id)
 
     def find_existing(self, post: Post) -> str | None:
-        marker = f"pk:{post.post_key}"
+        marker = _idempotency_marker(post)
         try:
             resp = self._get(
                 f"{self._ig_user_id()}/media",

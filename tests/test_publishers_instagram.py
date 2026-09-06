@@ -93,7 +93,11 @@ def test_publish_creates_container_polls_then_publishes(monkeypatch):
     media_call = next(c for c in calls["post"] if c[0].endswith("/media"))
     assert media_call[1]["video_url"] == "https://signed.example.com/x.mp4"
     assert "AI" in media_call[1]["caption"]
-    assert "pk:p1:instagram" in media_call[1]["caption"]
+    # 冪等キーの目印は完全不可視（ゼロ幅文字の並び）。生の "pk:" テキストは入れない。
+    cap = media_call[1]["caption"]
+    assert "pk:" not in cap
+    assert _idempotency_marker(_post()) in cap
+    assert all(ord(c) in (0x200b, 0x200c) for c in _idempotency_marker(_post()))
     assert len(calls["get"]) == 2  # IN_PROGRESS -> FINISHED
 
 

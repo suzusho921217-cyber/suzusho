@@ -42,6 +42,8 @@ def test_publish_is_idempotent_second_run(generated):
     pub = json.loads((generated / "publish-2026-09-02.json").read_text(encoding="utf-8"))
     assert {o["action"] for o in pub["outcomes"]} == {"ALREADY_PUBLISHED"}
     assert len(_posts(generated)) == _SLOTS * 2  # 増えない
+    # 2 回目は媒体 API を叩かず、管理DBの投稿済み記録だけで判定している
+    assert all("管理DB" in "".join(o["reasons"]) for o in pub["outcomes"])
 
 
 def test_publish_splits_generation_cost_across_platforms(tmp_path, monkeypatch):

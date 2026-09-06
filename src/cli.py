@@ -76,12 +76,12 @@ from src.media.processor import (
 )
 from src.metrics.collector import collect_snapshot, due_snapshots
 from src.planner.planner import build_daily_plan, next_day_allocation, render_prompt
-from src.policy.engine import check_prompt
+from src.policy.engine import check_prompt, policy_version
 from src.policy.policy_sync import check_feeds
 from src.publishers.base import PublishRequest
 from src.publishers.dryrun import DryRunPublisher
 from src.publishers.hashtags import select_caption_cta, select_hashtags
-from src.publishers.pipeline import decide_and_publish
+from src.publishers.pipeline import PublishOutcome, decide_and_publish
 from src.publishers.registry import get_publisher
 from src.sheets.client import get_store, snapshot_to_row
 
@@ -635,6 +635,18 @@ def cmd_publish(args: argparse.Namespace) -> int:
                 caption=caption.strip(),
                 tags=tags,
             )
+            # 冪等化の第一段: 管理DBに投稿済み記録があれば媒体APIを叩かずスキップ（§15）。
+            # 媒体側の目印（IGのキャプション埋め込み等）は、DB書き込みに失敗した隙間を
+            # 埋めるための第二の安全網として decide_and_publish 側に残す。
+            prior = store.get_post(post.post_key)
+            if prior and prior.status is PostStatus.PUBLISHED and prior.platform_post_id:
+                outcomes.append(asdict(PublishOutcome(
+                    plan.plan_id, platform, "ALREADY_PUBLISHED", prior.platform_post_id,
+                    policy_version(platform), ["管理DBに投稿済み記録あり（§15）"],
+                )))
+                ledger[f"{plan.plan_id}|{platform.value}|{account_id}"] = prior.platform_post_id
+                continue
+
             publisher = (
                 DryRunPublisher(platform, ledger=ledger)
                 if mode == "dryrun" else get_publisher(platform, mode=mode, brand=plan.brand)
@@ -814,9 +826,8 @@ def cmd_metrics(args: argparse.Namespace) -> int:
         json.dumps(baseline, ensure_ascii=False, indent=2), encoding="utf-8"
     )
 
-    # アカウント日次DBに当日分の実績を反映（既存の他フィールドは維持）:
-    # フォロワー数(今回取得できていれば)・当日投稿数・当日再生数・当日収益・
-    # 当日API費用(生成費)・guard.jsonから見た警告件数とステータス。
+    # アカウント日次DB（スリム化済み）: フォロワーの日次推移と guard 状態だけ記録する。
+    # 当日の再生数・投稿数・収益はパフォーマンスDBの集計欄と重複するので持たない。
     guard_map = _guard_map()
     by_account: dict[str, list[Post]] = {}
     for p in posts:
@@ -834,27 +845,7 @@ def cmd_metrics(args: argparse.Namespace) -> int:
         if followers is not None:
             row.followers = followers
 
-        today_posts = [
-            p for p in account_posts
-            if p.published_at and p.published_at.date().isoformat() == today
-        ]
-        row.daily_posts = len(today_posts)
-        daily_views = 0
-        daily_revenue = 0.0
-        for p in today_posts:
-            latest = next(
-                (s for s in store.list_snapshots(post_key=p.post_key) if s.snapshot == "latest"),
-                None,
-            )
-            if latest:
-                daily_views += latest.views or 0
-                daily_revenue += latest.revenue_jpy or 0.0
-        row.daily_views = daily_views
-        row.daily_revenue_jpy = round(daily_revenue, 2)
-        row.daily_api_cost_jpy = round(sum(p.generation_cost_jpy for p in today_posts), 2)
-
         guard = guard_map.get((brand_value, platform_value))
-        row.warnings = len(guard.triggers) if guard else 0
         if guard is None or guard.action == GuardAction.ALLOW:
             row.status = "ACTIVE"
         elif guard.action == GuardAction.STOP:

@@ -184,17 +184,16 @@ class PerformanceSnapshot:
 
 @dataclass
 class AccountDaily:
-    """§10.3 アカウント日次DB。"""
+    """§10.3 アカウント日次DB。フォロワーの日次推移と guard 状態の履歴だけを持つ軽いログ。
+
+    当日の再生数・投稿数・収益・API費用はパフォーマンスDBの集計欄と重複するので持たない
+    （2026-09-06 スリム化）。
+    """
     date: str
     brand: Brand
     platform: Platform
     account_id: str
     followers: int | None = None
-    daily_views: int | None = None
-    daily_posts: int = 0
-    daily_revenue_jpy: float = 0.0
-    daily_api_cost_jpy: float = 0.0
-    warnings: int = 0
     status: str = "ACTIVE"          # ACTIVE / HOLD / STOP
 
 

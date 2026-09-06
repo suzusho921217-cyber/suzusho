@@ -144,7 +144,7 @@ def test_upsert_snapshot_keeps_other_labels_separate(tmp_path):
 def test_account_daily_upsert_by_composite_key(tmp_path):
     store = LocalStore(tmp_path)
     row = AccountDaily(date="2026-09-02", brand=Brand.CAT, platform=Platform.YOUTUBE,
-                       account_id="cat-youtube", followers=100, daily_views=5000)
+                       account_id="cat-youtube", followers=100, status="ACTIVE")
     store.upsert_account_daily(row)
     store.upsert_account_daily(AccountDaily(date="2026-09-02", brand=Brand.CAT,
                                             platform=Platform.YOUTUBE, account_id="cat-youtube",
@@ -528,11 +528,11 @@ def test_sheets_account_daily_upsert_by_composite_key():
     store = _fake_store(tabs)
     store.upsert_account_daily(AccountDaily(
         date="2026-09-02", brand=Brand.CAT, platform=Platform.YOUTUBE,
-        account_id="cat-youtube", followers=100, daily_views=5000,
+        account_id="cat-youtube", followers=100, status="ACTIVE",
     ))
     store.upsert_account_daily(AccountDaily(
         date="2026-09-02", brand=Brand.CAT, platform=Platform.YOUTUBE,
-        account_id="cat-youtube", followers=120,
+        account_id="cat-youtube", followers=120, status="HOLD",
     ))
     rows = store.list_account_daily()
-    assert len(rows) == 1 and rows[0].followers == 120
+    assert len(rows) == 1 and rows[0].followers == 120 and rows[0].status == "HOLD"

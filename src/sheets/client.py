@@ -140,10 +140,7 @@ def _snapshot_row_with_na_markers(row: dict) -> dict:
 def account_daily_to_row(a: AccountDaily) -> dict:
     return {
         "date": a.date, "brand": a.brand.value, "platform": a.platform.value,
-        "account_id": a.account_id, "followers": a.followers,
-        "daily_views": a.daily_views, "daily_posts": a.daily_posts,
-        "daily_revenue_jpy": a.daily_revenue_jpy, "daily_api_cost_jpy": a.daily_api_cost_jpy,
-        "warnings": a.warnings, "status": a.status,
+        "account_id": a.account_id, "followers": a.followers, "status": a.status,
     }
 
 
@@ -151,10 +148,7 @@ def account_daily_from_row(d: dict) -> AccountDaily:
     return AccountDaily(
         date=d["date"], brand=Brand(d["brand"]), platform=Platform(d["platform"]),
         account_id=d["account_id"], followers=d.get("followers"),
-        daily_views=d.get("daily_views"), daily_posts=int(d.get("daily_posts", 0)),
-        daily_revenue_jpy=float(d.get("daily_revenue_jpy", 0.0)),
-        daily_api_cost_jpy=float(d.get("daily_api_cost_jpy", 0.0)),
-        warnings=int(d.get("warnings", 0)), status=d.get("status", "ACTIVE"),
+        status=d.get("status", "ACTIVE"),
     )
 
 
@@ -367,17 +361,13 @@ _ROUND_DIGITS: dict[str, int] = {
     "completion_rate": 1,
     "avg_watch_sec": 1,
     "generation_cost_jpy": 0, "revenue_jpy": 0,
-    "daily_revenue_jpy": 0, "daily_api_cost_jpy": 0,
 }
 
 _ACCOUNT_HEADERS_JA = {
     "date": "日付", "brand": "ブランド", "platform": "媒体", "account_id": "アカウントID",
-    "followers": "フォロワー数", "daily_views": "当日再生数", "daily_posts": "当日投稿数",
-    "daily_revenue_jpy": "当日収益", "daily_api_cost_jpy": "当日API費用",
-    "warnings": "警告件数", "status": "ステータス",
+    "followers": "フォロワー数", "status": "ステータス",
 }
-_ACCOUNT_NUMERIC = {"followers", "daily_views", "daily_posts", "daily_revenue_jpy",
-                     "daily_api_cost_jpy", "warnings"}
+_ACCOUNT_NUMERIC = {"followers"}
 
 # 意思決定ログ（agent-mtg 統括が毎日残す台帳）
 _DECISION_HEADERS_JA = {
@@ -393,10 +383,7 @@ _DECISION_HEADERS_JA = {
 _DECISION_NUMERIC = {"confidence"}
 _DECISION_UNITS = {"confidence": "%"}
 _DECISION_VALUE_MAPS = {"data_sufficient": {True: "十分", False: "不足"}}
-_ACCOUNT_UNITS = {
-    "followers": "人", "daily_views": "回", "daily_posts": "件",
-    "daily_revenue_jpy": "円", "daily_api_cost_jpy": "円", "warnings": "件",
-}
+_ACCOUNT_UNITS = {"followers": "人"}
 
 # --- Enum等の値も日本語表示にする変換表（コード内部は英語の Enum.value のまま） ---
 
