@@ -6,8 +6,10 @@ from datetime import datetime, timedelta, timezone
 import pytest
 
 from src.cli import main
+from src.common.config import load
 
 _JST = timezone(timedelta(hours=9))
+_SLOTS = load("scoring")["allocation"]["total_daily_slots"]  # 実 config の1日本数
 
 
 @pytest.fixture
@@ -24,9 +26,9 @@ def test_generate_submits_all_plans_with_mock(plan_file, tmp_path, monkeypatch, 
     assert rc == 0
     jobs = json.loads((tmp_path / "jobs-2026-09-02.json").read_text(encoding="utf-8"))
     assert jobs["provider"] == "mock"
-    assert len(jobs["jobs"]) == 6
+    assert len(jobs["jobs"]) == _SLOTS
     assert jobs["skipped"] == []
-    assert "投入=6" in capsys.readouterr().out
+    assert f"投入={_SLOTS}" in capsys.readouterr().out
 
 
 def test_poll_generation_completes_mock_jobs(plan_file, tmp_path, monkeypatch):
@@ -49,7 +51,7 @@ def test_generate_respects_budget_gate(plan_file, tmp_path, monkeypatch):
     }), encoding="utf-8")
     main(["generate", "--date", "2026-09-02"])
     jobs = json.loads((tmp_path / "jobs-2026-09-02.json").read_text(encoding="utf-8"))
-    assert len(jobs["skipped"]) == 6
+    assert len(jobs["skipped"]) == _SLOTS
     assert jobs["jobs"] == []
 
 
@@ -69,7 +71,7 @@ def test_generate_is_idempotent_across_runs(plan_file, tmp_path, monkeypatch, ca
     rc = main(["generate", "--date", "2026-09-02"])
     assert rc == 0
     jobs = json.loads((tmp_path / "jobs-2026-09-02.json").read_text(encoding="utf-8"))
-    assert len(jobs["jobs"]) == 6  # 12 にならない
+    assert len(jobs["jobs"]) == _SLOTS  # 12 にならない
     assert "スキップ" in capsys.readouterr().out
 
 

@@ -9,6 +9,9 @@ import pytest
 
 import src.cli as cli_module
 from src.cli import main
+from src.common.config import load
+
+_SLOTS = load("scoring")["allocation"]["total_daily_slots"]
 from src.common.models import Brand, Platform, PolicyDecision, Post, PostStatus
 from src.publishers.base import Publisher, PublishResult
 from src.sheets.client import LocalStore
@@ -30,7 +33,7 @@ def test_metrics_collects_and_writes_performance(published):
     rc = main(["metrics"])
     assert rc == 0
     perf = json.loads((published / "performance.json").read_text(encoding="utf-8"))
-    assert len(perf["records"]) == 12  # 6企画 × youtube/instagram の2媒体
+    assert len(perf["records"]) == _SLOTS * 2  # 企画数 × youtube/instagram の2媒体
     rec = perf["records"][0]
     assert rec["post"]["reality_level"] is not None
     # published_at は今なので latest だけ回収される（24h 未経過）
@@ -42,8 +45,8 @@ def test_metrics_latest_is_upserted_not_duplicated(published):
     main(["metrics"])
     main(["metrics"])
     snaps = json.loads((published / "db" / "snapshots.json").read_text(encoding="utf-8"))
-    # latest は履歴を残さず上書きされるので、2回実行しても 12投稿分のまま
-    assert len(snaps) == 12
+    # latest は履歴を残さず上書きされるので、2回実行しても投稿分のまま
+    assert len(snaps) == _SLOTS * 2
 
 
 class _FakeAccountPublisher(Publisher):

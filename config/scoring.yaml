@@ -1,7 +1,8 @@
 # スコアリングと自動配分（§11）
 
 allocation:
-  total_daily_slots: 6              # 1日6本を固定
+  total_daily_slots: 3              # 1日3本（¥5,000/月 プリペイドに合わせて。2026-09-06 6→3）
+                                    # Veo 720p 8秒 ¥64/本 × 3 = ¥192/日。媒体数は複数に展開する。
   exploit_ratio: 0.70              # 既存勝ちパターン
   explore_ratio: 0.30              # 新企画・新フック・新尺
   brand_max_ratio: 0.60           # 1ブランド配分上限

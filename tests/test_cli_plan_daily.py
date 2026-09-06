@@ -3,6 +3,9 @@
 import json
 
 from src.cli import main
+from src.common.config import load
+
+_SLOTS = load("scoring")["allocation"]["total_daily_slots"]
 
 
 def test_plan_daily_bootstrap_writes_file(tmp_path, capsys):
@@ -14,7 +17,7 @@ def test_plan_daily_bootstrap_writes_file(tmp_path, capsys):
     data = json.loads(out.read_text(encoding="utf-8"))
     assert data["date"] == "2026-08-31"
     assert data["allocation"]["mode"] == "equal"
-    assert len(data["plans"]) == 6
+    assert len(data["plans"]) == _SLOTS
     assert {p["brand"] for p in data["plans"]} == {"cat", "dog"}
     assert all(p["experiment_flag"] == "explore" for p in data["plans"])
     assert all(p["target_platforms"] == ["youtube", "instagram"] for p in data["plans"])
@@ -42,4 +45,4 @@ def test_plan_daily_performance_mode_with_winning_tags(tmp_path):
     flags = [p["experiment_flag"] for p in data["plans"]]
     assert "exploit" in flags and "explore" in flags
     plan_ids = [p["plan_id"] for p in data["plans"]]
-    assert len(plan_ids) == len(set(plan_ids)) == 6
+    assert len(plan_ids) == len(set(plan_ids)) == _SLOTS

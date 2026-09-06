@@ -5,6 +5,9 @@ import json
 import pytest
 
 from src.cli import main
+from src.common.config import load
+
+_SLOTS = load("scoring")["allocation"]["total_daily_slots"]
 
 
 @pytest.fixture
@@ -29,7 +32,7 @@ def test_publish_dryrun_publishes_all(generated):
     assert pub["mode"] == "dryrun"
     assert {o["action"] for o in pub["outcomes"]} == {"PUBLISHED"}
     posts = _posts(generated)
-    assert len(posts) == 12  # 6企画 × youtube/instagram の2媒体
+    assert len(posts) == _SLOTS * 2  # 企画数 × youtube/instagram の2媒体
     assert all(p["status"] == "PUBLISHED" and p["platform_post_id"] for p in posts.values())
 
 
@@ -38,7 +41,7 @@ def test_publish_is_idempotent_second_run(generated):
     main(["publish", "--date", "2026-09-02"])
     pub = json.loads((generated / "publish-2026-09-02.json").read_text(encoding="utf-8"))
     assert {o["action"] for o in pub["outcomes"]} == {"ALREADY_PUBLISHED"}
-    assert len(_posts(generated)) == 12  # 増えない
+    assert len(_posts(generated)) == _SLOTS * 2  # 増えない
 
 
 def test_publish_splits_generation_cost_across_platforms(tmp_path, monkeypatch):
