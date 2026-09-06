@@ -9,7 +9,7 @@ import pytest
 
 import src.cli as cli_module
 from src.cli import main
-from src.common.models import AccountDaily, Brand, Platform, PolicyDecision, Post, PostStatus
+from src.common.models import Brand, Platform, PolicyDecision, Post, PostStatus
 from src.publishers.base import Publisher, PublishResult
 from src.sheets.client import LocalStore
 
@@ -62,36 +62,37 @@ class _FakeAccountPublisher(Publisher):
         return 120
 
 
-def test_metrics_tracks_followers_before_and_after(tmp_path, monkeypatch):
+def test_metrics_daily_delta_is_vs_prev_day_not_prev_run(tmp_path, monkeypatch):
+    """前日比: 1日に何回 metrics を回しても「前日の最終値」との差で出る（§10.2）。"""
     monkeypatch.setattr(cli_module, "STATE_DIR", tmp_path)
     monkeypatch.setattr(cli_module, "get_publisher", lambda platform, brand=None: _FakeAccountPublisher())
 
-    # published_at は「今」に固定する。過去日を直書きすると実行日次第で 24h/72h/7d の
-    # スナップショットも due になり件数が変わる（このテストは latest 1 件だけを見たい）。
     now = datetime.now(_JST)
+    yday = (now - timedelta(days=1)).date().isoformat()
     store = LocalStore(tmp_path / "db")
-    store.upsert_account_daily(AccountDaily(
-        date=(now - timedelta(days=3)).date().isoformat(), brand=Brand.DOG,
-        platform=Platform.YOUTUBE, account_id="dog-youtube", followers=100,
-    ))
     store.upsert_post(Post(
         post_key="p1:youtube", master_video_id="p1", brand=Brand.DOG,
         platform=Platform.YOUTUBE, account_id="dog-youtube", concept_tag="c",
         hook_type="h", character_id="DOG_001", duration_sec=8, oddity_level=1,
         prompt_version="v1", generation_cost_jpy=32.0, policy_version="v1",
         policy_result=PolicyDecision.PASS, status=PostStatus.PUBLISHED,
-        published_at=now,
-        platform_post_id="yt-1",
+        published_at=now, platform_post_id="yt-1",
     ))
+    # 昨日の最終計測: 再生 300 / フォロワー 100
+    (tmp_path / "metrics_baseline.json").write_text(json.dumps({
+        "p1:youtube": {"run_date": yday, "run_views": 300, "run_followers": 100},
+    }), encoding="utf-8")
 
-    rc = main(["metrics"])
-    assert rc == 0
+    # _FakeAccountPublisher は views=500 / followers=120 を返す
+    assert main(["metrics"]) == 0
+    assert main(["metrics"]) == 0  # 同じ日に2回目
 
     snaps = store.list_snapshots(post_key="p1:youtube")
     assert len(snaps) == 1
-    assert snaps[0].followers_before == 100
+    assert snaps[0].views == 500
+    assert snaps[0].views_delta == 200      # 500 - 300（前回実行比の 0 ではない）
     assert snaps[0].followers_after == 120
-    assert snaps[0].followers_delta == 20
+    assert snaps[0].followers_delta == 20   # 120 - 100
 
     today_rows = [a for a in store.list_account_daily() if a.account_id == "dog-youtube"]
     todays = max(today_rows, key=lambda a: a.date)

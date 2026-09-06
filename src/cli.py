@@ -744,6 +744,16 @@ def cmd_metrics(args: argparse.Namespace) -> int:
             return None
         return max(candidates, key=lambda a: a.date).followers
 
+    # 前日比の基準値（§10.2）: 1日に何回 metrics を回しても「前回計測比」ではなく
+    # 「前日比 = 今の値 − 前日の最後に計測した値」で出すため、投稿ごとに基準を持つ。
+    # .state/metrics_baseline.json は GCS 共有されるのでワークフロー間でも一貫する。
+    #   prev_* … 比較の基準（通常は昨日の最終計測値）。run_* … 当日の最新計測値。
+    #   日付が変わると run_* が prev_* に昇格する。
+    baseline_path = STATE_DIR / "metrics_baseline.json"
+    baseline: dict = (
+        json.loads(baseline_path.read_text(encoding="utf-8")) if baseline_path.exists() else {}
+    )
+
     collected = 0
     for post in posts:
         existing = {s.snapshot for s in store.list_snapshots(post_key=post.post_key)}
@@ -762,22 +772,47 @@ def cmd_metrics(args: argparse.Namespace) -> int:
                 followers_cache[cache_key] = None
         current_followers = followers_cache[cache_key]
 
+        bl = baseline.get(post.post_key, {})
+        if bl.get("run_date") and bl["run_date"] < today:
+            # 昨日以前の当日ぶんを「前日基準」に昇格
+            bl["prev_date"] = bl["run_date"]
+            bl["prev_views"] = bl.get("run_views")
+            bl["prev_followers"] = bl.get("run_followers")
+
         followers_before = _followers_before(post)
+        latest_views = None
         for label in due:
             snap = collect_snapshot(post, label, raw, followers_before=followers_before, now=now)
             if current_followers is not None:
                 if snap.followers_before is None:
                     snap.followers_before = followers_before
                 snap.followers_after = current_followers
-                if followers_before is not None:
-                    snap.followers_delta = current_followers - followers_before
             # "latest" は毎回この投稿の現在値を1行で持ちたい（履歴を残さず上書き）。
             # 24h/72h/7d はその時点の記録として一度きり追記する。
             if label == "latest":
-                store.upsert_snapshot(snap)
+                latest_views = snap.views
+                if bl.get("prev_date"):
+                    if snap.views is not None and bl.get("prev_views") is not None:
+                        snap.views_delta = snap.views - bl["prev_views"]
+                    if current_followers is not None and bl.get("prev_followers") is not None:
+                        snap.followers_delta = current_followers - bl["prev_followers"]
+                store.upsert_snapshot(snap, compute_delta=False)
             else:
                 store.append_snapshot(snap)
             collected += 1
+
+        # 当日の最新値を記録（prev は据え置き＝同じ日に何度回しても前日比は動かない）
+        bl["run_date"] = today
+        if latest_views is not None:
+            bl["run_views"] = latest_views
+        if current_followers is not None:
+            bl["run_followers"] = current_followers
+        baseline[post.post_key] = bl
+
+    baseline_path.parent.mkdir(parents=True, exist_ok=True)
+    baseline_path.write_text(
+        json.dumps(baseline, ensure_ascii=False, indent=2), encoding="utf-8"
+    )
 
     # アカウント日次DBに当日分の実績を反映（既存の他フィールドは維持）:
     # フォロワー数(今回取得できていれば)・当日投稿数・当日再生数・当日収益・
