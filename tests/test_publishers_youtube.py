@@ -164,6 +164,19 @@ def test_publish_returns_failed_result_on_http_error(monkeypatch, tmp_path):
     assert result.error
 
 
+def test_publish_returns_failed_result_on_missing_video_file(monkeypatch, tmp_path):
+    # MediaFileUpload はコンストラクタでファイルを開く/statするため、動画パスが
+    # 存在しないとそこで例外が飛ぶ。videos.insert() まで辿り着けなくても丸ごと
+    # クラッシュせず FAILED として返る（呼び出し元でリトライ・スキップできる）ことを確認する。
+    missing_path = str(tmp_path / "does-not-exist.mp4")
+    pub = YouTubePublisher()
+    _wire(monkeypatch, pub, youtube=_FakeYouTube())
+
+    result = pub.publish(_req(video_path=missing_path))
+    assert result.ok is False
+    assert result.error
+
+
 def test_publish_returns_failed_result_on_missing_credentials(monkeypatch, tmp_path):
     # ブランド別のリフレッシュトークンが未設定だと google.auth.exceptions.RefreshError になる。
     # これで丸ごとクラッシュせず、他ブランドの投稿には影響しないことを確認する。

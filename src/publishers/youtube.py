@@ -72,8 +72,11 @@ class YouTubePublisher(Publisher):
                 "containsSyntheticMedia": bool(req.ai_disclosure),
             },
         }
-        media = MediaFileUpload(req.video_path, chunksize=-1, resumable=True)
         try:
+            # MediaFileUpload はコンストラクタでファイルを開く/statするため、動画パスが
+            # 空・不正だとここで例外が飛ぶ。videos.insert() 側の例外と合わせて同じ
+            # try で拾い、FAILED（呼び出し元でリトライ対象）として扱う。
+            media = MediaFileUpload(req.video_path, chunksize=-1, resumable=True)
             resp = self._youtube().videos().insert(
                 part="snippet,status", body=body, media_body=media,
             ).execute()
