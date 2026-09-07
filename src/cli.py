@@ -643,57 +643,67 @@ def cmd_publish(args: argparse.Namespace) -> int:
         video_ocs: list[PublishOutcome] = []
         for platform in pending:
             account_id = f"{plan.brand.value}-{platform.value}"  # TODO: アカウント設定を config 化
-            post = Post(
-                post_key=f"{plan.plan_id}:{platform.value}",
-                master_video_id=plan.plan_id, brand=plan.brand, platform=platform,
-                account_id=account_id, concept_tag=plan.concept_tag, hook_type=plan.hook_type,
-                character_id=plan.character_id, duration_sec=plan.duration_target_sec,
-                oddity_level=plan.oddity_level, reality_level=plan.reality_level,
-                prompt_version=plan.prompt_version,
-                generation_cost_jpy=cost_per_platform,
-                policy_version="", policy_result=PolicyDecision.PASS,
-                status=PostStatus.PUBLISHING,
-            )
-            tags = select_hashtags(
-                plan.brand.value, platform.value, date=date,
-                character_id=plan.character_id,
-            )
-            cta = select_caption_cta(plan.concept_tag, date=date)
-            species = {"cat": "子猫", "dog": "子犬"}.get(plan.brand.value, "")
-            caption = f"{plan.concept_tag}な{species}"
-            if cta:
-                caption += f"\n\n{cta}"
-            caption += f"\n\n{' '.join(tags)}"
-            req = PublishRequest(
-                post=post,
-                video_path=variants.get(f"{plan.plan_id}|{platform.value}")
-                or jd.get("local_path") or "",
-                title=f"{plan.concept_tag}｜{plan.hook_type}",
-                caption=caption.strip(),
-                tags=tags,
-            )
-            # 冪等化の第二段（媒体側の目印。DB書き込みに失敗した隙間を埋める安全網）は
-            # decide_and_publish 側に残す。第一段の DB チェックは pending 仕分けで済み。
-            publisher = (
-                DryRunPublisher(platform, ledger=ledger)
-                if mode == "dryrun" else get_publisher(platform, mode=mode, brand=plan.brand)
-            )
-            guard = guard_map.get((plan.brand.value, platform.value))
-            oc = decide_and_publish(plan, platform, req, publisher=publisher, guard=guard)
+            # 1媒体ぶんの投稿処理を丸ごと try で囲む。ここで想定外の例外（媒体API
+            # ラッパーが拾い損ねたもの等）が飛ぶと、以前はこの publish 実行全体が
+            # クラッシュして outcomes を1件も保存できなかった（2026-09-07 の障害）。
+            # 1媒体の失敗を FAILED として記録し、他の動画・媒体の投稿は続行する。
+            try:
+                post = Post(
+                    post_key=f"{plan.plan_id}:{platform.value}",
+                    master_video_id=plan.plan_id, brand=plan.brand, platform=platform,
+                    account_id=account_id, concept_tag=plan.concept_tag,
+                    hook_type=plan.hook_type,
+                    character_id=plan.character_id, duration_sec=plan.duration_target_sec,
+                    oddity_level=plan.oddity_level, reality_level=plan.reality_level,
+                    prompt_version=plan.prompt_version,
+                    generation_cost_jpy=cost_per_platform,
+                    policy_version="", policy_result=PolicyDecision.PASS,
+                    status=PostStatus.PUBLISHING,
+                )
+                tags = select_hashtags(
+                    plan.brand.value, platform.value, date=date,
+                    character_id=plan.character_id,
+                )
+                cta = select_caption_cta(plan.concept_tag, date=date)
+                species = {"cat": "子猫", "dog": "子犬"}.get(plan.brand.value, "")
+                caption = f"{plan.concept_tag}な{species}"
+                if cta:
+                    caption += f"\n\n{cta}"
+                caption += f"\n\n{' '.join(tags)}"
+                req = PublishRequest(
+                    post=post,
+                    video_path=variants.get(f"{plan.plan_id}|{platform.value}")
+                    or jd.get("local_path") or "",
+                    title=f"{plan.concept_tag}｜{plan.hook_type}",
+                    caption=caption.strip(),
+                    tags=tags,
+                )
+                # 冪等化の第二段（媒体側の目印。DB書き込みに失敗した隙間を埋める安全網）は
+                # decide_and_publish 側に残す。第一段の DB チェックは pending 仕分けで済み。
+                publisher = (
+                    DryRunPublisher(platform, ledger=ledger)
+                    if mode == "dryrun" else get_publisher(platform, mode=mode, brand=plan.brand)
+                )
+                guard = guard_map.get((plan.brand.value, platform.value))
+                oc = decide_and_publish(plan, platform, req, publisher=publisher, guard=guard)
 
-            post.policy_version = oc.policy_version
-            post.status = _PUBLISH_STATUS.get(oc.action, PostStatus.FAILED)
-            if oc.published:
-                post.platform_post_id = oc.platform_post_id
-                existing = store.get_post(post.post_key)
-                post.published_at = (
-                    existing.published_at if existing and existing.published_at
-                    else datetime.now(JST)
-                )
-                ledger[f"{post.master_video_id}|{platform.value}|{account_id}"] = (
-                    oc.platform_post_id
-                )
-            store.upsert_post(post)
+                post.policy_version = oc.policy_version
+                post.status = _PUBLISH_STATUS.get(oc.action, PostStatus.FAILED)
+                if oc.published:
+                    post.platform_post_id = oc.platform_post_id
+                    existing = store.get_post(post.post_key)
+                    post.published_at = (
+                        existing.published_at if existing and existing.published_at
+                        else datetime.now(JST)
+                    )
+                    ledger[f"{post.master_video_id}|{platform.value}|{account_id}"] = (
+                        oc.platform_post_id
+                    )
+                store.upsert_post(post)
+            except Exception as e:  # noqa: BLE001 - 1媒体の未知の例外で実行全体を落とさない
+                print(f"[publish] ! {plan.plan_id} [{platform.value}] 想定外のエラーで失敗: {e}")
+                oc = PublishOutcome(plan.plan_id, platform, "FAILED", None,
+                                     policy_version(platform), [f"想定外のエラー: {e}"])
             video_ocs.append(oc)
             outcomes.append(asdict(oc))
 

@@ -96,6 +96,32 @@ def test_publish_splits_generation_cost_across_platforms(tmp_path, monkeypatch):
     assert all(p["generation_cost_jpy"] == 32.0 for p in posts.values())
 
 
+def test_publish_survives_unexpected_error_in_one_platform(generated, monkeypatch):
+    # 2026-09-07: 媒体APIラッパーが拾い損ねた想定外の例外で publish 実行全体が
+    # クラッシュし、その回の outcomes が1件も保存されなかった（cat-02が宙に浮いた）。
+    # 1媒体の想定外エラーは FAILED として記録し、他の媒体・動画の投稿は続行する。
+    import src.cli as cli_module
+
+    real_decide = cli_module.decide_and_publish
+
+    def _boom(plan, platform, req, **kwargs):
+        if platform.value == "youtube":
+            raise RuntimeError("媒体APIラッパーが拾い損ねた想定外のエラー")
+        return real_decide(plan, platform, req, **kwargs)
+
+    monkeypatch.setattr(cli_module, "decide_and_publish", _boom)
+
+    rc = main(["publish", "--date", "2026-09-02"])
+    assert rc == 0  # 実行全体はクラッシュしない
+
+    pub = json.loads((generated / "publish-2026-09-02.json").read_text(encoding="utf-8"))
+    assert pub["outcomes"]  # 何かしら保存されている（0件で失われていない）
+    by_platform = {(o["plan_id"], o["platform"]): o["action"] for o in pub["outcomes"]}
+    assert all(a == "FAILED" for (_, p), a in by_platform.items() if p == "youtube")
+    # instagram 側は影響を受けず投稿できている
+    assert any(a == "PUBLISHED" for (_, p), a in by_platform.items() if p == "instagram")
+
+
 def test_publish_respects_guard_hold(generated):
     (generated / "guard.json").write_text(json.dumps({
         "targets": [{"brand": "cat", "platform": "youtube", "action": "HOLD",
