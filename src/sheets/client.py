@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import abc
 import json
+import time
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -447,6 +448,32 @@ def _parse_dt_ja(display_str: str) -> str:
         return display_str
 
 
+_MAX_ATTEMPTS = 3
+_RETRY_BACKOFF_SEC = 5.0
+_RETRYABLE_STATUS = {429, 500, 502, 503, 504}
+
+
+def _execute_with_retry(request, *, sleep=time.sleep):
+    """Sheets API呼び出しの一過性エラー（レート制限・過負荷）だけ数回リトライする。
+
+    2026-09-06/07 の metrics ワークフロー連続失敗はこれが原因
+    （429 Quota exceeded, 503 Service Unavailable）。
+    認証エラー等リトライしても直らない4xx（429以外）はそのまま投げる。
+    """
+    from googleapiclient.errors import HttpError
+
+    for attempt in range(1, _MAX_ATTEMPTS + 1):
+        try:
+            return request.execute()
+        except HttpError as e:
+            status = getattr(e.resp, "status", None)
+            if status not in _RETRYABLE_STATUS or attempt == _MAX_ATTEMPTS:
+                raise
+            print(f"[sheets] Sheets API 一時エラー（{attempt}/{_MAX_ATTEMPTS}回目, "
+                  f"status={status}）: {e}. {_RETRY_BACKOFF_SEC}秒後にリトライ")
+            sleep(_RETRY_BACKOFF_SEC * attempt)
+
+
 class SheetsStore(Store):
     """Google Sheets バックエンド。3タブ（投稿DB／パフォーマンスDB／アカウント日次DB）。
 
@@ -503,9 +530,9 @@ class SheetsStore(Store):
         return self._service
 
     def _fetch_raw(self, tab: str) -> list[list[str]]:
-        res = self._svc().spreadsheets().values().get(
+        res = _execute_with_retry(self._svc().spreadsheets().values().get(
             spreadsheetId=self.spreadsheet_id, range=tab,
-        ).execute()
+        ))
         return res.get("values", [])
 
     @staticmethod
@@ -625,16 +652,16 @@ class SheetsStore(Store):
             # range は見出し行から下に絞る（見出しより上に集計欄等があっても、
             # そちらを「表」として誤検出して追記されないようにするため）。
             append_range = f"{tab}!A{header_idx}:Z" if header_idx else tab
-            svc.append(
+            _execute_with_retry(svc.append(
                 spreadsheetId=self.spreadsheet_id, range=append_range,
                 valueInputOption="RAW", insertDataOption="OVERWRITE",
                 body={"values": [values]},
-            ).execute()
+            ))
         else:
-            svc.update(
+            _execute_with_retry(svc.update(
                 spreadsheetId=self.spreadsheet_id, range=f"{tab}!A{match_row_number}",
                 valueInputOption="RAW", body={"values": [values]},
-            ).execute()
+            ))
 
     # --- 投稿DB --------------------------------------------------------
 
