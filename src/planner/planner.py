@@ -12,7 +12,8 @@ plan_daily.yml が1日1回呼ぶ。前日までの成績（learning の出力）
 from __future__ import annotations
 
 import math
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
+from itertools import zip_longest
 
 from src.common.models import (
     Brand,
@@ -308,14 +309,18 @@ def build_daily_plan(
     exploit 枠はブランドの winning_tags を score 降順で採用。不足分は explore と同じ
     生成にフォールバックし ``notes`` に記録する。explore 枠は未使用の
     (concept_tag, hook_type) 組み合わせを日付シードで巡回選択する。
+
+    返す順序はブランドをラウンドロビンで交互に並べる（cat, dog, cat, ...）。
+    generate は日次予算上限に達した時点でこの順に処理を打ち切るため（§13）、
+    ブランドごとに固めて並べると後ろのブランドが構造的に生成されなくなる
+    （2026-09-06〜08、catが先頭固定で毎日dogが予算切れの被害を受けていた）。
     """
     defaults = planning_cfg.get("defaults", {})
     prompt_version_default = str(defaults.get("prompt_version", "v1"))
     duration_range = defaults.get("duration_target_sec", [6, 15])
     seed = _date_seed(date)
 
-    plans: list[ContentPlan] = []
-    seq = 0
+    per_brand_plans: list[list[ContentPlan]] = []
 
     for ba in allocation.brands:
         brand = _coerce_brand(ba.brand) or ba.brand
@@ -338,15 +343,15 @@ def build_daily_plan(
         )
         combos = _explore_combos(pool, brand_winning, seed)
         cursor = 0  # explore 系の企画で使った combo 数
+        brand_plans: list[ContentPlan] = []
 
         # --- exploit 枠: winning_tags を score 降順で採用。不足分は新規企画で補填 ---
         for k in range(ba.exploit):
-            seq += 1
             if k < len(brand_winning):
-                plans.append(_exploit_plan(ctx, seq, brand_winning[k], combos[0], k))
+                brand_plans.append(_exploit_plan(ctx, 0, brand_winning[k], combos[0], k))
             else:
-                plans.append(_explore_plan(
-                    ctx, seq, combos[cursor % len(combos)], cursor,
+                brand_plans.append(_explore_plan(
+                    ctx, 0, combos[cursor % len(combos)], cursor,
                     flag=ExperimentFlag.EXPLOIT,
                     notes="exploit: 勝ちタグ不足のため新規企画で補填",
                 ))
@@ -354,13 +359,25 @@ def build_daily_plan(
 
         # --- explore 枠: 未使用の (concept_tag, hook_type) を巡回選択 ---
         for _ in range(ba.explore):
-            seq += 1
-            plans.append(_explore_plan(
-                ctx, seq, combos[cursor % len(combos)], cursor,
+            brand_plans.append(_explore_plan(
+                ctx, 0, combos[cursor % len(combos)], cursor,
                 flag=ExperimentFlag.EXPLORE,
                 notes="explore: 未使用の企画タグ×フック組み合わせ",
             ))
             cursor += 1
+
+        per_brand_plans.append(brand_plans)
+
+    # ブランドごとの並びを崩さず、ブランド間だけラウンドロビンで交互に取り出す。
+    # plan_id の連番(seq)はここで最終順序に合わせて振り直す。
+    plans: list[ContentPlan] = []
+    seq = 0
+    for round_items in zip_longest(*per_brand_plans):
+        for plan in round_items:
+            if plan is None:
+                continue
+            seq += 1
+            plans.append(replace(plan, plan_id=f"{plan.date}-{plan.brand.value}-{seq:02d}"))
 
     return plans
 

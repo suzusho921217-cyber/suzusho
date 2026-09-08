@@ -135,6 +135,16 @@ def test_levels_within_configured_range():
         assert 6 <= p.duration_target_sec <= 15
 
 
+def test_brands_are_interleaved_round_robin():
+    # generate は日次予算上限に達すると先頭からこの順で打ち切る（§13）。
+    # ブランドごとに固めて並べると、先頭ブランドが常に予算を使い切ってしまう
+    # （2026-09-06〜08、catが先頭固定で毎日dogが割を食っていた）。
+    alloc = _alloc(cat=(0, 2), dog=(0, 1))
+    plans = build_daily_plan("2026-09-08", alloc, [], PLANNING, PLATFORMS)
+    brands_in_order = [p.brand for p in plans]
+    assert brands_in_order == [Brand.CAT, Brand.DOG, Brand.CAT]
+
+
 def test_unknown_brand_pool_raises():
     alloc = DailyAllocation(1, "equal", [BrandAllocation(Brand.ADULT, 1, 0, 1)])
     # adult はプールにあるので通る; プール無しブランドを模す
