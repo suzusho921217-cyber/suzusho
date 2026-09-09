@@ -54,12 +54,20 @@ jobs:
 
       - name: 自動反映したconfigをコミット
         run: |
-          if [ -n "$(git status --porcelain config/)" ]; then
-            git config user.name "agent-mtg[bot]"
-            git config user.email "agent-mtg@users.noreply.github.com"
-            git add config/planning.yaml config/hashtags.yaml
-            git commit -m "agent-mtg: 自動反映（費用・ポリシー無関係の企画/ハッシュタグのみ）"
-            git push
-          else
+          if [ -z "$(git status --porcelain config/)" ]; then
             echo "変更なし、コミットしない"
+            exit 0
           fi
+          git config user.name "agent-mtg[bot]"
+          git config user.email "agent-mtg@users.noreply.github.com"
+          git add config/planning.yaml config/hashtags.yaml
+          git commit -q -m "agent-mtg: 自動反映（費用・ポリシー無関係の企画/ハッシュタグのみ）"
+          # push 時点で main が先に進んでいたら rebase して再試行。それでも
+          # push できなくても workflow は失敗させない（翌日の実行で反映される）。
+          for i in 1 2 3; do
+            if git push -q origin HEAD:main; then echo "pushed"; exit 0; fi
+            git fetch -q origin main
+            git rebase -q origin/main
+            sleep 5
+          done
+          echo "::warning::agent-mtg の config 反映を push できなかった（翌日の実行で反映される）"
