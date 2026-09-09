@@ -102,6 +102,36 @@ def test_metrics_daily_delta_is_vs_prev_day_not_prev_run(tmp_path, monkeypatch):
     assert todays.followers == 120
 
 
+def test_metrics_new_post_without_baseline_counts_full_views_as_delta(tmp_path, monkeypatch):
+    """新規投稿は昨日基準が無いが、昨日の再生数は本当に0（投稿が存在しなかった）ので、
+    初回計測の再生数がそのまま前日比に乗る（§10.2）。アカウント集計の前日比が
+    新着動画の伸びを取りこぼさないようにするため。フォロワーは投稿より前から
+    存在するアカウント単位の値なので、基準が無いときは架空の急増を防ぐため
+    delta を出さない（None のまま）。"""
+    monkeypatch.setattr(cli_module, "STATE_DIR", tmp_path)
+    monkeypatch.setattr(cli_module, "get_publisher", lambda platform, brand=None: _FakeAccountPublisher())
+
+    now = datetime.now(_JST)
+    store = LocalStore(tmp_path / "db")
+    store.upsert_post(Post(
+        post_key="p2:youtube", master_video_id="p2", brand=Brand.DOG,
+        platform=Platform.YOUTUBE, account_id="dog-youtube", concept_tag="c",
+        hook_type="h", character_id="DOG_001", duration_sec=8, oddity_level=1,
+        prompt_version="v1", generation_cost_jpy=32.0, policy_version="v1",
+        policy_result=PolicyDecision.PASS, status=PostStatus.PUBLISHED,
+        published_at=now, platform_post_id="yt-2",
+    ))
+    # metrics_baseline.json を書かない（＝この投稿は今回が初めての計測）
+
+    assert main(["metrics"]) == 0
+
+    snaps = store.list_snapshots(post_key="p2:youtube")
+    assert len(snaps) == 1
+    assert snaps[0].views == 500
+    assert snaps[0].views_delta == 500       # 300ではなく0基準（前日は存在しなかった）
+    assert snaps[0].followers_delta is None  # フォロワーは基準が無ければ出さない
+
+
 def test_metrics_account_daily_records_followers_and_guard_status(tmp_path, monkeypatch):
     """スリム化後のアカウント日次DB: フォロワー数と guard 状態だけを日次で残す。"""
     monkeypatch.setattr(cli_module, "STATE_DIR", tmp_path)

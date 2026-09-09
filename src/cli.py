@@ -847,9 +847,19 @@ def cmd_metrics(args: argparse.Namespace) -> int:
             # 24h/72h/7d はその時点の記録として一度きり追記する。
             if label == "latest":
                 latest_views = snap.views
+                # 再生数は「基準が無ければ 0 とみなす」。投稿は昨日まで存在しなかった
+                # （＝昨日の再生数は本当に 0）ので、これで初回計測日の再生数がそのまま
+                # 前日比に乗る。ここを bl.get("prev_date") 必須にすると、新規投稿した
+                # 当日〜翌日ぶんの再生数がアカウント集計の前日比に一切乗らず、
+                # 新着動画の伸びが丸ごと抜け落ちていた。
+                if snap.views is not None:
+                    prev_views = bl["prev_views"] if bl.get("prev_date") else 0
+                    if prev_views is not None:
+                        snap.views_delta = snap.views - prev_views
+                # フォロワー数はアカウント単位の値（投稿より前から存在する）なので、
+                # 実際の基準が無いのに 0 とみなすと架空の急増に見えてしまう。
+                # 基準が取れているときだけ計算する。
                 if bl.get("prev_date"):
-                    if snap.views is not None and bl.get("prev_views") is not None:
-                        snap.views_delta = snap.views - bl["prev_views"]
                     if current_followers is not None and bl.get("prev_followers") is not None:
                         snap.followers_delta = current_followers - bl["prev_followers"]
                 store.upsert_snapshot(snap, compute_delta=False)
