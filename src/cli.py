@@ -1045,6 +1045,23 @@ def cmd_kill_switch(args: argparse.Namespace) -> int:
             print(f"      - {r}")
     print(f"[kill-switch] wrote {out}")
 
+    # 見守り（§5）: plan_daily は1日1回しかチャンスが無く、GitHub Actions の
+    # concurrency キュー（sns-pipeline-state）が混んでいると本体を実行できずに
+    # キャンセルされることがある(2026-09-09 実際に発生、誰も気づかず終日投稿ゼロ)。
+    # kill-switch は毎時動くので、そのついでに「今日のプランがあるか」を見張る。
+    now = datetime.now(JST)
+    plan_path = STATE_DIR / f"plan-{now.date().isoformat()}.json"
+    if now.hour >= 7 and not plan_path.exists():
+        print(f"[kill-switch] ! {plan_path.name} が無い（plan_daily 未実行の可能性）")
+        send_alert_email(
+            "[AI動画自動投稿] 今日のプランが無い",
+            f"{plan_path.name} が存在しません。plan_daily が今日まだ実行できていない"
+            "可能性があります（GitHub Actions の concurrency キューで"
+            "他のワークフローに割り込まれてキャンセルされた等）。\n\n"
+            "Actions → plan_daily → Run workflow で手動実行してください"
+            "（続けて generate も手動実行が必要です）。",
+        )
+
     if overall.action.value != "ALLOW":
         lines = [f"overall={overall.action.value}"]
         if budget_verdict.blocked:

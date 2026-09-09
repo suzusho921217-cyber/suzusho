@@ -1,8 +1,16 @@
 """cli kill-switch の配線テスト（予算/シグナル JSON → 停止判定 JSON）。"""
 
 import json
+from datetime import datetime as _real_datetime
 
+import src.cli as cli
 from src.cli import main
+
+
+class _FixedDatetime(_real_datetime):
+    @classmethod
+    def now(cls, tz=None):
+        return cls(2026, 9, 9, 10, 0, tzinfo=tz)
 
 
 def test_kill_switch_no_input_allows(tmp_path, capsys):
@@ -54,3 +62,31 @@ def test_kill_switch_sheets_failure_stops_all(tmp_path):
     rc = main(["kill-switch", "--input", str(inp), "--out", str(out)])
     assert rc == 3
     assert json.loads(out.read_text(encoding="utf-8"))["overall"] == "STOP"
+
+
+# --- 見守り: 今日のプランが無ければ通知（plan_daily がキューでキャンセルされた場合の検知）---
+
+def test_kill_switch_alerts_when_todays_plan_missing(tmp_path, monkeypatch):
+    monkeypatch.setattr(cli, "STATE_DIR", tmp_path)  # plan-2026-09-09.json を置かない
+    monkeypatch.setattr(cli, "datetime", _FixedDatetime)  # 10:00 JST（>=7時）
+    sent: list[tuple[str, str]] = []
+    monkeypatch.setattr(cli, "send_alert_email", lambda subject, body, **kw: sent.append((subject, body)))
+
+    out = tmp_path / "guard.json"
+    main(["kill-switch", "--input", str(tmp_path / "missing.json"), "--out", str(out)])
+
+    assert len(sent) == 1
+    assert "プラン" in sent[0][0]
+
+
+def test_kill_switch_does_not_alert_when_todays_plan_exists(tmp_path, monkeypatch):
+    (tmp_path / "plan-2026-09-09.json").write_text("{}", encoding="utf-8")
+    monkeypatch.setattr(cli, "STATE_DIR", tmp_path)
+    monkeypatch.setattr(cli, "datetime", _FixedDatetime)
+    sent: list[tuple[str, str]] = []
+    monkeypatch.setattr(cli, "send_alert_email", lambda subject, body, **kw: sent.append((subject, body)))
+
+    out = tmp_path / "guard.json"
+    main(["kill-switch", "--input", str(tmp_path / "missing.json"), "--out", str(out)])
+
+    assert sent == []
