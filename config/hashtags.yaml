@@ -11,20 +11,25 @@
 cat:
   youtube:
     always: ["#Shorts", "#猫", "#cat", "#cats"]
-    pool: ["#子猫", "#kitten", "#かわいい猫", "#cutecat", "#catsofyoutube", "#猫のいる暮らし",
-           "#ねこ", "#癒し", "#funnycats", "#猫動画", "#catlover", "#kittensofyoutube"]
+    pool:
+    - '#猫'
+    - '#cat'
+    - '#catsoftiktok'
+    - '#ねこあるある'
+    - '#かわいい'
     per_video: 4
   tiktok:
     always: ["#猫", "#cat", "#catsoftiktok", "#fyp"]
-    pool: ["#子猫", "#kitten", "#かわいい", "#cutecat", "#foryou", "#foryoupage",
-           "#猫好きさんと繋がりたい", "#catlover", "#funnycat", "#ねこ", "#猫のいる生活",
-           "#kittensoftiktok"]
+    pool: ["#子猫", "#kitten", "#かわいい", "#cutecat", "#foryou", "#foryoupage", "#猫好きさんと繋がりたい", "#catlover", "#funnycat", "#ねこ", "#猫のいる生活", "#kittensoftiktok"]
     per_video: 5
   instagram:
     always: ["#猫", "#cat", "#catstagram", "#catsofinstagram"]
-    pool: ["#ねこすたぐらむ", "#子猫", "#kitten", "#kittensofinstagram", "#にゃんすたぐらむ",
-           "#cutecat", "#catlover", "#猫のいる暮らし", "#instacat", "#ペット", "#癒し",
-           "#ねこら部", "#みんねこ"]
+    pool:
+    - '#猫'
+    - '#kitten'
+    - '#かわいい'
+    - '#ねこら部'
+    - '#短毛猫'
     per_video: 6
   x:
     always: ["#猫", "#cat"]
@@ -34,20 +39,20 @@ cat:
 dog:
   youtube:
     always: ["#Shorts", "#犬", "#dog", "#dogs"]
-    pool: ["#子犬", "#puppy", "#かわいい犬", "#cutedog", "#dogsofyoutube", "#犬のいる暮らし",
-           "#いぬ", "#わんこ", "#doglover", "#犬動画", "#puppiesofyoutube", "#funnydogs"]
+    pool:
+    - '#わんこ'
+    - '#dog'
+    - '#dogsoftiktok'
+    - '#コーギー'
+    - '#柴犬'
     per_video: 4
   tiktok:
     always: ["#犬", "#dog", "#dogsoftiktok", "#fyp"]
-    pool: ["#子犬", "#puppy", "#かわいい", "#cutedog", "#foryou", "#foryoupage",
-           "#犬好きさんと繋がりたい", "#doglover", "#funnydog", "#わんこ", "#犬のいる生活",
-           "#puppiesoftiktok"]
+    pool: ["#子犬", "#puppy", "#かわいい", "#cutedog", "#foryou", "#foryoupage", "#犬好きさんと繋がりたい", "#doglover", "#funnydog", "#わんこ", "#犬のいる生活", "#puppiesoftiktok"]
     per_video: 5
   instagram:
     always: ["#犬", "#dog", "#dogstagram", "#dogsofinstagram"]
-    pool: ["#いぬすたぐらむ", "#子犬", "#puppy", "#puppiesofinstagram", "#わんすたぐらむ",
-           "#cutedog", "#doglover", "#犬のいる暮らし", "#instadog", "#ペット", "#癒し",
-           "#わんこ部", "#ふわもこ部"]
+    pool: ["#いぬすたぐらむ", "#子犬", "#puppy", "#puppiesofinstagram", "#わんすたぐらむ", "#cutedog", "#doglover", "#犬のいる暮らし", "#instadog", "#ペット", "#癒し", "#わんこ部", "#ふわもこ部"]
     per_video: 6
   x:
     always: ["#犬", "#dog"]
