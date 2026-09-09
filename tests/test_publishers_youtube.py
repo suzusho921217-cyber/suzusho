@@ -198,12 +198,16 @@ def test_publish_returns_failed_result_on_missing_credentials(monkeypatch, tmp_p
 # --- find_existing ---------------------------------------------------------
 
 def test_find_existing_returns_video_id_when_tag_matches(monkeypatch):
+    tag = _idempotency_tag(_post())
     search = _FakeSearchResource(result={"items": [{"id": {"videoId": "yt-999"}}]})
+    videos = _FakeVideosResource(list_result={
+        "items": [{"id": "yt-999", "snippet": {"tags": [tag, "cat"]}}],
+    })
     pub = YouTubePublisher()
-    _wire(monkeypatch, pub, youtube=_FakeYouTube(search=search))
+    _wire(monkeypatch, pub, youtube=_FakeYouTube(search=search, videos=videos))
 
     assert pub.find_existing(_post()) == "yt-999"
-    assert search.calls[0]["q"] == _idempotency_tag(_post())
+    assert search.calls[0]["q"] == tag
     assert search.calls[0]["forMine"] is True
 
 
@@ -218,6 +222,21 @@ def test_find_existing_returns_none_on_api_error(monkeypatch):
     search = _FakeSearchResource(error=err)
     pub = YouTubePublisher()
     _wire(monkeypatch, pub, youtube=_FakeYouTube(search=search))
+    assert pub.find_existing(_post()) is None
+
+
+def test_find_existing_ignores_fuzzy_search_false_positive(monkeypatch):
+    # search().list の q は全文検索であいまい一致するため、日付だけ違う post_key の
+    # 動画（トークンがほぼ共通）を候補として返してくることがある。実タグが完全一致
+    # しない候補は既存投稿とみなさない（2026-09-09 に実際にこれで誤検知した）。
+    other_tag = _idempotency_tag(_post(post_key="p1-2026-09-08:youtube"))
+    search = _FakeSearchResource(result={"items": [{"id": {"videoId": "yt-old"}}]})
+    videos = _FakeVideosResource(list_result={
+        "items": [{"id": "yt-old", "snippet": {"tags": [other_tag, "cat"]}}],
+    })
+    pub = YouTubePublisher()
+    _wire(monkeypatch, pub, youtube=_FakeYouTube(search=search, videos=videos))
+
     assert pub.find_existing(_post()) is None
 
 

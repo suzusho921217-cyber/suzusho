@@ -88,15 +88,32 @@ class YouTubePublisher(Publisher):
         from google.auth.exceptions import GoogleAuthError
         from googleapiclient.errors import HttpError
 
+        tag = _idempotency_tag(post)
         try:
             resp = self._youtube().search().list(
                 part="id", forMine=True, type="video",
-                q=_idempotency_tag(post), maxResults=1,
+                q=tag, maxResults=5,
             ).execute()
         except (HttpError, GoogleAuthError):
             return None  # 照会に失敗しても投稿自体は続行させる（新規投稿を試みる）
-        items = resp.get("items", [])
-        return items[0]["id"]["videoId"] if items else None
+        video_ids = [item["id"]["videoId"] for item in resp.get("items", [])]
+        if not video_ids:
+            return None
+        # search().list の q は全文検索（あいまい一致）。日付だけ違う post_key
+        # （例: 2026-09-08-cat-01 と 2026-09-09-cat-01）のように他のトークンが
+        # ほぼ共通だと、無関係な別日の動画を「既存投稿」と誤認する
+        # （2026-09-09 に実際発生: 前日分の video_id を書いて新規投稿をスキップした）。
+        # 候補の実タグに冪等キーが文字列として完全一致するものだけを既存投稿とみなす。
+        try:
+            details = self._youtube().videos().list(
+                part="snippet", id=",".join(video_ids),
+            ).execute()
+        except (HttpError, GoogleAuthError):
+            return None
+        for item in details.get("items", []):
+            if tag in (item.get("snippet", {}).get("tags") or []):
+                return item["id"]
+        return None
 
     def fetch_metrics(self, platform_post_id: str) -> dict:
         from google.auth.exceptions import GoogleAuthError
