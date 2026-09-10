@@ -514,6 +514,12 @@ class SheetsStore(Store):
         self.credentials_file = credentials_file or env("GOOGLE_SHEETS_CREDENTIALS_FILE")
         self.credentials_json = credentials_json or env("GOOGLE_SERVICE_ACCOUNT_JSON")
         self._service = None
+        # タブ単位の生セルキャッシュ（§10 §15）: upsert系は1件ごとに「読んで該当行を
+        # 探す→もう一度読んでヘッダーを取る→書く」で毎回シート全体を再取得しており、
+        # 投稿数が増えるほど Sheets API の読み取り上限（60回/分/ユーザー）に達して
+        # metrics が丸ごと失敗していた(2026-09-07〜10 連続発生)。同一プロセス内では
+        # 他から書き換わらない前提で、自分の書き込み直後だけ無効化して使い回す。
+        self._raw_cache: dict[str, list[list[str]]] = {}
 
     # --- 内部: Sheets API ---------------------------------------------------
 
@@ -542,10 +548,14 @@ class SheetsStore(Store):
         return self._service
 
     def _fetch_raw(self, tab: str) -> list[list[str]]:
+        if tab in self._raw_cache:
+            return self._raw_cache[tab]
         res = _execute_with_retry(self._svc().spreadsheets().values().get(
             spreadsheetId=self.spreadsheet_id, range=tab,
         ))
-        return res.get("values", [])
+        raw = res.get("values", [])
+        self._raw_cache[tab] = raw
+        return raw
 
     @staticmethod
     def _find_header_row(
@@ -674,6 +684,9 @@ class SheetsStore(Store):
                 spreadsheetId=self.spreadsheet_id, range=f"{tab}!A{match_row_number}",
                 valueInputOption="RAW", body={"values": [values]},
             ))
+        # 書いた内容がキャッシュに反映されていないと、次の読み取りが古いまま
+        # （例: 直後の重複チェックが今書いた行を見つけられない）になるので破棄する。
+        self._raw_cache.pop(tab, None)
 
     # --- 投稿DB --------------------------------------------------------
 

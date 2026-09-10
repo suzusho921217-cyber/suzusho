@@ -312,6 +312,41 @@ def test_sheets_header_row_found_even_with_summary_block_above():
     assert tabs["投稿DB"][0] == ["ブランド", "媒体", "集計"]
 
 
+def test_sheets_store_caches_reads_within_a_run_and_refreshes_after_write(monkeypatch):
+    # upsert 1件ごとに「該当行を探すため読む→書く前にもう一度ヘッダーを読む」で
+    # シート全体を毎回再取得しており、投稿数が増えると Sheets API の読み取り上限
+    # (60回/分/ユーザー) に達して metrics が丸ごと失敗していた(2026-09-07〜10)。
+    # 同一プロセス内は自分の書き込み以外で変わらない前提でタブ単位にキャッシュし、
+    # 自分が書いた直後だけ破棄して最新を読み直す。
+    tabs = {"投稿DB": [_POST_HEADER_JA]}
+    store = _fake_store(tabs)
+    get_calls = []
+    orig_get = _FakeValues.get
+
+    def counting_get(self, **kw):
+        get_calls.append(1)
+        return orig_get(self, **kw)
+
+    monkeypatch.setattr(_FakeValues, "get", counting_get)
+
+    store.upsert_post(_post())  # 新規: 検索用の読み取りが1回だけになるはず
+    assert len(get_calls) == 1
+
+    get_calls.clear()
+    store.get_post("p1:youtube")  # 直前の書き込みで無効化されているので1回読む
+    assert len(get_calls) == 1
+
+    get_calls.clear()
+    store.get_post("p1:youtube")  # 何も書いていないのでキャッシュを使い回す(0回)
+    assert len(get_calls) == 0
+
+    get_calls.clear()
+    # 直前の get_post でキャッシュ済みのままなので、検索用の読み取りすら不要
+    store.upsert_post(_post(status=PostStatus.FAILED))
+    assert len(get_calls) == 0
+    assert store.get_post("p1:youtube").status == PostStatus.FAILED
+
+
 def test_sheets_upsert_post_appends_when_missing():
     tabs = {"投稿DB": [_POST_HEADER_JA]}
     store = _fake_store(tabs)
