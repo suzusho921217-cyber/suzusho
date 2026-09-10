@@ -25,7 +25,20 @@ def test_plan_daily_bootstrap_writes_file(tmp_path, capsys):
     assert "mode=equal" in capsys.readouterr().out
 
 
-def test_plan_daily_performance_mode_with_winning_tags(tmp_path):
+def test_plan_daily_performance_mode_with_winning_tags(tmp_path, monkeypatch):
+    # このテストは exploit/explore 両方が出る枠数(cat1ブランドに2枠以上)を前提にしている。
+    # 本番の total_daily_slots（予算に応じて変動する）と切り離して固定する。
+    import src.cli as cli_module
+    from src.common.config import load as real_load
+
+    def _load(name):
+        cfg = real_load(name)
+        if name == "scoring":
+            cfg = {**cfg, "allocation": {**cfg["allocation"], "total_daily_slots": 3}}
+        return cfg
+
+    monkeypatch.setattr(cli_module, "load", _load)
+
     wt = tmp_path / "wt.json"
     wt.write_text(json.dumps([
         {"brand": "cat", "concept_tag": "驚き", "hook_type": "視線誘導",
@@ -45,4 +58,4 @@ def test_plan_daily_performance_mode_with_winning_tags(tmp_path):
     flags = [p["experiment_flag"] for p in data["plans"]]
     assert "exploit" in flags and "explore" in flags
     plan_ids = [p["plan_id"] for p in data["plans"]]
-    assert len(plan_ids) == len(set(plan_ids)) == _SLOTS
+    assert len(plan_ids) == len(set(plan_ids)) == 3

@@ -58,8 +58,21 @@ def test_daily_learning_min_posts_gate(tmp_path):
     assert data["winning_tags"] == []  # 2本 < min_posts_for_winner(3)
 
 
-def test_learning_output_feeds_plan_daily(tmp_path):
+def test_learning_output_feeds_plan_daily(tmp_path, monkeypatch):
     """daily-learning の出力を plan-daily がそのまま食える（ループが閉じる）。"""
+    # このテストは exploit/explore 両方が出る枠数を前提にしている。本番の
+    # total_daily_slots（予算に応じて変動する）と切り離して固定する。
+    import src.cli as cli_module
+    from src.common.config import load as real_load
+
+    def _load(name):
+        cfg = real_load(name)
+        if name == "scoring":
+            cfg = {**cfg, "allocation": {**cfg["allocation"], "total_daily_slots": 3}}
+        return cfg
+
+    monkeypatch.setattr(cli_module, "load", _load)
+
     wt = tmp_path / "wt.json"
     main(["daily-learning", "--input", str(_perf_file(tmp_path)), "--out", str(wt)])
 
