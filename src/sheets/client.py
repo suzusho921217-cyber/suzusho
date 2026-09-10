@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import abc
 import json
+import ssl
 import time
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -453,11 +454,16 @@ _RETRY_BACKOFF_SEC = 5.0
 _RETRYABLE_STATUS = {429, 500, 502, 503, 504}
 
 
+_TRANSIENT_NETWORK_ERRORS = (TimeoutError, ConnectionError, ssl.SSLError)
+
+
 def _execute_with_retry(request, *, sleep=time.sleep):
-    """Sheets API呼び出しの一過性エラー（レート制限・過負荷）だけ数回リトライする。
+    """Sheets API呼び出しの一過性エラー（レート制限・過負荷・回線切れ）だけ数回リトライする。
 
     2026-09-06/07 の metrics ワークフロー連続失敗はこれが原因
     （429 Quota exceeded, 503 Service Unavailable）。
+    2026-09-09 には HTTP レイヤーまで届かない TCP/TLS タイムアウト
+    （socket 層の TimeoutError）で同じく無リトライのまま落ちた。
     認証エラー等リトライしても直らない4xx（429以外）はそのまま投げる。
     """
     from googleapiclient.errors import HttpError
@@ -471,6 +477,12 @@ def _execute_with_retry(request, *, sleep=time.sleep):
                 raise
             print(f"[sheets] Sheets API 一時エラー（{attempt}/{_MAX_ATTEMPTS}回目, "
                   f"status={status}）: {e}. {_RETRY_BACKOFF_SEC}秒後にリトライ")
+            sleep(_RETRY_BACKOFF_SEC * attempt)
+        except _TRANSIENT_NETWORK_ERRORS as e:
+            if attempt == _MAX_ATTEMPTS:
+                raise
+            print(f"[sheets] Sheets API 通信エラー（{attempt}/{_MAX_ATTEMPTS}回目, "
+                  f"{type(e).__name__}）: {e}. {_RETRY_BACKOFF_SEC}秒後にリトライ")
             sleep(_RETRY_BACKOFF_SEC * attempt)
 
 
