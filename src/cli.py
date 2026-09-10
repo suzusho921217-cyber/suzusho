@@ -859,9 +859,8 @@ def cmd_metrics(args: argparse.Namespace) -> int:
                 # フォロワー数はアカウント単位の値（投稿より前から存在する）なので、
                 # 実際の基準が無いのに 0 とみなすと架空の急増に見えてしまう。
                 # 基準が取れているときだけ計算する。
-                if bl.get("prev_date"):
-                    if current_followers is not None and bl.get("prev_followers") is not None:
-                        snap.followers_delta = current_followers - bl["prev_followers"]
+                if bl.get("prev_date") and current_followers is not None and bl.get("prev_followers") is not None:
+                    snap.followers_delta = current_followers - bl["prev_followers"]
                 store.upsert_snapshot(snap, compute_delta=False)
             else:
                 store.append_snapshot(snap)

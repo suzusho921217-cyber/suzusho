@@ -3,7 +3,7 @@
 import json
 from datetime import datetime as _real_datetime
 
-import src.cli as cli
+from src import cli
 from src.cli import main
 
 
