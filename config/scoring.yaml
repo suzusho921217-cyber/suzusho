@@ -36,3 +36,23 @@ learning:
     "7": 0.6
     "30": 0.4
   min_posts_for_winner: 3          # 直近30日でこの本数未満の組は勝ちタグにしない（異常値ガード §11）
+
+  # 企画として狙って作ったものではない投稿（手動テスト等）を勝ちタグ抽出から除外する
+  # post_key の一覧。2026-09-05: Veo APIテストで先に生成済みのサンプル動画を
+  # 「Cat Moments開設記念」として正式投稿した2本（新規plan側は exclude_from_learning
+  # で対応済みだが、この2本は投稿DB側に遡って反映していないためここでも明示除外）。
+  excluded_post_keys:
+    - "2026-09-05-cat-sample01:youtube"
+    - "2026-09-05-cat-sample01-ig:instagram"
+
+  # 媒体別の重み上書き（completion_rate に頼れない媒体向け）。
+  # YouTube Shorts は Analytics API が averageViewDuration / engagedViews を
+  # 常に 0・欠損で返す（2026-09-11 実データで全件確認）ため completion_rate が
+  # 常時欠損になる。指定しなければ compute_score が毎回自動で残り指標に
+  # 重みを再分配するが、それを「YouTubeはこの指標を使わない」という明示設定にする。
+  score_weight_overrides:
+    youtube:
+      share_rate: 0.36
+      follow_rate: 0.36
+      comment_rate: 0.14
+      cost_efficiency: 0.14

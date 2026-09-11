@@ -208,9 +208,22 @@ def extract_winning_tags(
         "score_weights_post_monetization" if monetized else "score_weights_pre_monetization",
         {},
     )
+    # 媒体別に使える指標が違う場合の重み上書き（例: YouTube は completion_rate が
+    # 常に欠損するので、その媒体だけ残り指標に重みを配り直した専用セットを使う）。
+    weight_overrides = learning_cfg.get("score_weight_overrides") or {}
     snapshot_order = tuple(learning_cfg.get("score_snapshot_order") or _DEFAULT_SNAPSHOT_ORDER)
     win_weights = _window_weights(learning_cfg.get("eval_window_weights"))
     min_posts = int(learning_cfg.get("min_posts_for_winner", 3))
+
+    # 手動テスト投稿など「企画として狙って作ったものではない」枠は集計対象外
+    # （2026-09-05 の手動テスト投稿混入対策）。新規投稿は post.exclude_from_learning、
+    # 過去の投稿DB分は post_key を指定する excluded_post_keys のどちらでも除外できる。
+    excluded_keys = set(learning_cfg.get("excluded_post_keys") or ())
+    records = [
+        (post, snaps) for post, snaps in records
+        if not post.get("exclude_from_learning")
+        and not any(s.post_key in excluded_keys for s in snaps.values() if s is not None)
+    ]
 
     norm = compute_norm(records, snapshot_order=snapshot_order)
 
@@ -226,9 +239,11 @@ def extract_winning_tags(
         age_days = (now - published).total_seconds() / 86400.0
         if age_days < 0:
             age_days = 0.0
+        platform_key = _tag_value("platform", post.get("platform"))
+        post_weights = weight_overrides.get(platform_key, weights)
         score = compute_score(
             snap,
-            weights=weights,
+            weights=post_weights,
             cost_jpy=_as_float(post.get("generation_cost_jpy")),
             norm=norm,
         )

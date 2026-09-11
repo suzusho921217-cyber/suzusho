@@ -192,6 +192,52 @@ def test_extract_winning_tags_output_types_normalized():
     assert w["reality_level"] == 4 and isinstance(w["reality_level"], int)
 
 
+def test_extract_winning_tags_excludes_flagged_records():
+    """exclude_from_learning=True の投稿（手動テスト投稿等）は集計対象外。"""
+    records = [
+        _rec(TAG_A, 2, 0.9), _rec(TAG_A, 3, 0.9), _rec(TAG_A, 4, 0.9),
+    ]
+    excluded_post, snaps = _rec(TAG_B, 2, 0.99)
+    excluded_post["exclude_from_learning"] = True
+    records += [(excluded_post, snaps), _rec(TAG_B, 3, 0.99), _rec(TAG_B, 4, 0.99)]
+    winners = extract_winning_tags(records, CONFIG, now=NOW)
+    # TAG_B は除外対象1本を除くと2本しかなく min_posts_for_winner(3)未満 → 勝ちタグ化しない
+    assert [w["concept_tag"] for w in winners] == ["違和感"]
+
+
+def test_extract_winning_tags_excludes_by_post_key():
+    """excluded_post_keys に載っている post_key(snapshot経由) は集計対象外。"""
+    records = [
+        _rec(TAG_A, 2, 0.9), _rec(TAG_A, 3, 0.9), _rec(TAG_A, 4, 0.9),
+    ]
+    excluded_post, excluded_snaps = _rec(TAG_B, 2, 0.99)
+    excluded_snaps["7d"] = _snap(completion_rate=0.99, post_key="excluded-key")
+    records += [(excluded_post, excluded_snaps), _rec(TAG_B, 3, 0.99), _rec(TAG_B, 4, 0.99)]
+    config = {**CONFIG, "learning": {**CONFIG["learning"], "excluded_post_keys": ["excluded-key"]}}
+    winners = extract_winning_tags(records, config, now=NOW)
+    assert [w["concept_tag"] for w in winners] == ["違和感"]
+
+
+def test_extract_winning_tags_platform_weight_override():
+    """score_weight_overrides の媒体は completion_rate 抜きの専用重みで採点される。"""
+    config = {
+        "score_weights_pre_monetization": {"completion_rate": 1.0},
+        "learning": {
+            "monetized": False,
+            "min_posts_for_winner": 1,
+            "eval_window_weights": {"7": 1.0, "30": 0.0},
+            "score_snapshot_order": ["7d"],
+            "score_weight_overrides": {"youtube": {"share_rate": 1.0}},
+        },
+    }
+    post = {**TAG_A, "generation_cost_jpy": 100, "published_at": NOW.isoformat()}
+    snap = _snap(completion_rate=None, views=1000, shares=100)  # share_rate=0.1
+    winners = extract_winning_tags([(post, {"7d": snap})], config, now=NOW)
+    # 既定の重み(completion_rate: 1.0)なら欠損で score=0 になるはずだが、
+    # youtube 用の上書き(share_rate: 1.0)が使われ share_rate=0.1 がそのままスコアになる。
+    assert winners[0]["score"] == pytest.approx(0.1)
+
+
 def test_next_day_allocation_is_planner_reexport():
     from src.planner.planner import next_day_allocation as planner_alloc
 

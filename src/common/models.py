@@ -84,6 +84,9 @@ class ContentPlan:
     prompt_text: str | None = None
     target_platforms: list[Platform] = field(default_factory=list)
     notes: str = ""
+    # 手動テスト投稿など「企画として狙って作ったものではない」枠を勝ちタグ抽出から
+    # 外すためのフラグ（§11の乖離対策。2026-09-05 の手動テスト投稿混入を機に導入）。
+    exclude_from_learning: bool = False
 
 
 @dataclass
@@ -149,6 +152,7 @@ class Post:
     reality_level: int | None = None    # §6 企画モデル由来（勝ちタグの粒度に使う §11）
     published_at: datetime | None = None
     platform_post_id: str | None = None
+    exclude_from_learning: bool = False  # ContentPlan.exclude_from_learning から継承
 
 
 @dataclass

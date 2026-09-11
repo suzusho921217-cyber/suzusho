@@ -294,6 +294,7 @@ def _plan_from_dict(d: dict) -> ContentPlan:
         prompt_text=d.get("prompt_text"),
         target_platforms=[Platform(p) for p in d.get("target_platforms", [])],
         notes=d.get("notes", ""),
+        exclude_from_learning=bool(d.get("exclude_from_learning", False)),
     )
 
 
@@ -659,6 +660,7 @@ def cmd_publish(args: argparse.Namespace) -> int:
                     generation_cost_jpy=cost_per_platform,
                     policy_version="", policy_result=PolicyDecision.PASS,
                     status=PostStatus.PUBLISHING,
+                    exclude_from_learning=plan.exclude_from_learning,
                 )
                 tags = select_hashtags(
                     plan.brand.value, platform.value, date=date,
@@ -756,6 +758,7 @@ def _write_performance_json(store) -> int:
                 "prompt_version": p.prompt_version, "platform": p.platform.value,
                 "generation_cost_jpy": p.generation_cost_jpy,
                 "published_at": p.published_at.isoformat() if p.published_at else None,
+                "exclude_from_learning": p.exclude_from_learning,
             },
             "snapshots": {lbl: snapshot_to_row(s) for lbl, s in snaps.items()},
         })
