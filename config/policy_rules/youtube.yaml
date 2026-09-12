@@ -5,8 +5,8 @@
 #   https://support.google.com/youtube/answer/1311392   (収益化: inauthentic content)
 # 詳細な要約は docs/platform_policies.md を参照。
 
-version: "2026-08-30"
-source_checked_at: "2026-08-30"
+version: "2026-09-13"
+source_checked_at: "2026-09-13"
 
 # 実写級AI生成は「Altered or synthetic content」開示が必須。publish 段階で付与する。
 ai_disclosure_required: true
