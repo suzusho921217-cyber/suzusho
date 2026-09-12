@@ -33,7 +33,7 @@ _ALIASES: dict[str, tuple[str, ...]] = {
     "likes": ("likes", "like_count", "favorites"),
     "comments": ("comments", "comment_count", "replies"),
     "shares": ("shares", "share_count", "reposts", "retweets"),
-    "saved": ("saved", "saves", "save_count"),
+    "saved": ("saved", "saves", "save_count", "videosAddedToPlaylists"),
     "impressions": ("impressions", "impression_count"),
     "avg_watch_sec": ("avg_watch_sec", "average_view_duration_sec", "averageViewDuration"),
     "revenue_jpy": ("revenue_jpy", "estimated_revenue_jpy", "estimatedRevenue"),

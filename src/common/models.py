@@ -170,7 +170,7 @@ class PerformanceSnapshot:
     likes: int | None = None
     comments: int | None = None
     shares: int | None = None
-    saved: int | None = None  # Instagram「保存」数。他媒体には概念が無い（-表示）
+    saved: int | None = None  # 保存数。Instagramは「保存」、YouTubeはプレイリスト追加数
     impressions: int | None = None
     avg_watch_sec: float | None = None
     completion_rate: float | None = None

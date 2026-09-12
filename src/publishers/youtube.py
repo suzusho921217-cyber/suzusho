@@ -2,7 +2,8 @@
 
 API: YouTube Data API v3 `videos.insert`（投稿）+ YouTube Analytics API（指標）。
 注意: 未監査APIプロジェクトのアップロードは private 制限があり得る（監査前提）。
-指標: views / engagedViews / averageViewDuration / shares / subscribersGained / estimatedRevenue
+指標: views / engagedViews / averageViewDuration / shares / subscribersGained /
+      videosAddedToPlaylists(保存扱い) / estimatedRevenue
 Secrets(env): YOUTUBE_OAUTH_CLIENT_ID / _SECRET は共通（同じOAuthアプリ）。
 リフレッシュトークンはブランド別チャンネルごとに別物（例: 猫チャンネルと犬チャンネル）
 なので `YOUTUBE_OAUTH_REFRESH_TOKEN_<BRAND>`（例: `_CAT` / `_DOG`）を使う。
@@ -142,7 +143,9 @@ class YouTubePublisher(Publisher):
         # 収益は別リクエストに分離し、非収益指標が失敗を道連れにしないようにする。
         try:
             metrics.update(self._fetch_analytics(
-                platform_post_id, "engagedViews,averageViewDuration,shares,subscribersGained",
+                platform_post_id,
+                "engagedViews,averageViewDuration,shares,subscribersGained,"
+                "videosAddedToPlaylists",
             ))
         except (HttpError, GoogleAuthError) as e:
             print(f"[youtube] Analytics(非収益指標) 取得失敗（基本指標のみで継続）: {e}")

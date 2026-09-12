@@ -116,7 +116,7 @@ COORDINATOR_SYSTEM = """\
 ★読み手はエンジニアではありません。専門用語・英語の変数名をそのまま使わず、
 かみ砕いた日本語に言い換えること。例:
 - completion_rate / 完全視聴 → 「最後まで見てもらえた割合」
-- save_rate / 保存率 → 「保存された割合」（Instagram限定、YouTubeには無い指標）
+- save_rate / 保存率 → 「保存された割合」（YouTubeは『後で見る/プレイリスト追加』を保存として扱う）
 - exploit / explore → 「勝ちパターンを増やす / 新しいネタを試す」
 - avg_watch_sec → 「平均視聴秒数」
 - winning_tags → 「勝ちパターン」

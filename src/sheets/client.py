@@ -126,7 +126,6 @@ def _fill_views_delta(snap: PerformanceSnapshot, old_views) -> None:
 # Instagramはオーガニック投稿の収益指標自体がAPIに存在しない。
 _SNAPSHOT_NA_MARKERS: dict[str, set[str] | None] = {
     "engaged_views": {"instagram"},  # Instagramにはエンゲージ視聴数に相当する指標が無い
-    "saved": {"youtube"},            # 「保存」はInstagram固有の概念でYouTubeには無い
     "impressions": None,             # 両媒体ともAPIで取得不可
     "revenue_jpy": None,             # 両媒体とも取得不可(YouTubeは収益化すれば直る)
 }
