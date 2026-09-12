@@ -79,12 +79,56 @@ analystは「データの健全性」チェックでこれらを欠損として�
   （YouTubeのengagedViewsに相当するものがない）。「-」表示が正常。
 - Flwr数(前日比) / 再生数(前日比)がnull: 投稿・計測を始めたばかりで「前日の基準値」が
   まだ無いだけ（正常）。増減が0という意味ではなく「まだ比較できない」という意味。
+- 2026-09-12にYouTubeの犬(Dog Moments)チャンネルのOAuth認証が一時的に失効し、
+  この日の一部投稿で全指標が欠損していた（同日中に再認証して解消済み）。
+  「特定の日だけ特定ブランドの数値が全滅している」ように見えるのはこれが原因の
+  可能性が高く、現在は解消済みなので継続対応は不要。
 """
+
+_ALLOCATION_NOTES = """\
+## ブランド配分の仕組み（毎回確認してから「配分を調整する」と決めないこと）
+
+- 猫/犬の投稿本数配分は、winning_tagsのスコアに比例配分するアルゴリズムが
+  「毎日の新規生成」に対して自動で決めている。coordinatorが直接指定する手段は
+  存在しない（auto_applyのkindに配分系は set_allocation_ratio しか無く、これは
+  「活用(exploit) vs 探索(explore)」の全体比率だけで、ブランド間の配分比率とは別物）。
+  「dog配分を増やす/調整する」という決定を出しても、それを実行するコードが無いため
+  plan-json には反映されない。ブランド間配分を変えたいなら、まず「そのための
+  auto_applyを追加してほしい」とneeds_user_approvalで報告すること。
+- brand_max_ratio（config/scoring.yaml、既定60%）は「その日新しく生成する分」だけの
+  上限で、投稿全体の累積比率の上限ではない。現在の1日の生成本数（2本）だと
+  猫/犬それぞれ最大1本=機械的に必ず50:50になる。「累積で見ると猫が偏っている」のは
+  本数を絞る前（〜2026-09-10）の投稿が母数に残っているだけで、直近の生成は
+  ちゃんと50:50なので、これ自体は対応不要な過去の名残り。
+"""
+
+
+def _recent_engineering_changes() -> str:
+    """直近のgitコミットログ（エンジニアが手動で行った修正・実装）。
+
+    人間のエンジニア（Claude Code等）がこのリポジトリに加えた変更を、
+    エージェントが常に把握した状態で会議できるようにするための材料。
+    手動でメモを更新し続ける運用は忘れられるので、gitログから自動生成する。
+    """
+    import subprocess
+
+    repo_root = Path(__file__).resolve().parents[2]
+    try:
+        out = subprocess.run(
+            ["git", "log", "--since=14 days ago", "--date=format:%Y-%m-%d",
+             "--pretty=format:- %ad %h %s"],
+            cwd=repo_root, capture_output=True, text=True, timeout=10, check=True,
+        ).stdout.strip()
+    except (subprocess.SubprocessError, OSError):
+        return "## 直近のエンジニアリング変更（コミットログ）\n取得できなかった（git不在 or 浅いclone）"
+    if not out:
+        return "## 直近のエンジニアリング変更（コミットログ）\n直近14日の変更なし"
+    return "## 直近のエンジニアリング変更（コミットログ、直近14日）\n" + out[:4000]
 
 
 def gather_context() -> str:
     """全役職共通の状況説明テキスト（configの現状 + 直近の実績）。"""
-    parts: list[str] = [_KNOWN_METRIC_GAPS]
+    parts: list[str] = [_KNOWN_METRIC_GAPS, _ALLOCATION_NOTES, _recent_engineering_changes()]
 
     brands = load("brands")
     parts.append("## config/brands.yaml（ブランド定義）\n" + json.dumps(brands, ensure_ascii=False, indent=2))

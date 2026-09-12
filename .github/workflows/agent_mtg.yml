@@ -21,6 +21,10 @@ jobs:
     environment: production
     steps:
       - uses: actions/checkout@v4
+        with:
+          # context.pyが直近14日のgit logを会議の材料にするため、浅いcloneではなく
+          # 履歴ごと取得する（既定のfetch-depth:1だと最新1コミットしか見えない）。
+          fetch-depth: 0
 
       - uses: actions/setup-python@v5
         with:
