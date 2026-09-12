@@ -58,9 +58,33 @@ def _performance_summary(store) -> str:
     return json.dumps(records, ensure_ascii=False, indent=2, default=str)[:8000]
 
 
+_KNOWN_METRIC_GAPS = """\
+## 既知のAPI仕様上の欠損（バグではない・毎回の異常報告に含めない）
+
+これらは媒体API側の仕様上の制約で、うちのコードを直しても解消しない。
+analystは「データの健全性」チェックでこれらを欠損として指摘しないこと
+（指摘してもユーザーは対応できず、毎回同じ話が繰り返されるだけになるため）。
+
+- YouTube completion_rate（完視聴率）: YouTube Analytics APIが
+  averageViewDuration/engagedViewsを全Shorts投稿で常に0返す（2026-09-11実データ確認済）。
+  YouTube Shorts特有の既知の制約。学習側は既にこの指標を除外する重み設定で対応済み。
+- YouTube revenue_jpy（収益）: チャンネルが未収益化（登録者1,000人+90日で
+  ショート1,000万再生などYouTubeパートナープログラムの条件未達）の間は
+  そもそも収益データが存在しない。これは正常な状態で、収益化条件を満たすまで解消しない。
+- YouTube impressions（表示回数）: YouTube Analytics APIにこの指標の識別子自体が
+  存在しない（権限の問題ではない）。公開APIでは取得不可。
+- Instagram impressions（Reels）: Instagram Media Insights APIがReelsでは
+  この指標を非対応（他のメディア種別では取れるらしいがReelsは明示的に除外されている）。
+- Instagram eng視聴数（engaged views相当）: Instagramにはそもそもこの概念が存在しない
+  （YouTubeのengagedViewsに相当するものがない）。「-」表示が正常。
+- Flwr数(前日比) / 再生数(前日比)がnull: 投稿・計測を始めたばかりで「前日の基準値」が
+  まだ無いだけ（正常）。増減が0という意味ではなく「まだ比較できない」という意味。
+"""
+
+
 def gather_context() -> str:
     """全役職共通の状況説明テキスト（configの現状 + 直近の実績）。"""
-    parts: list[str] = []
+    parts: list[str] = [_KNOWN_METRIC_GAPS]
 
     brands = load("brands")
     parts.append("## config/brands.yaml（ブランド定義）\n" + json.dumps(brands, ensure_ascii=False, indent=2))
