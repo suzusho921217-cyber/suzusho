@@ -49,7 +49,7 @@ WINNING_TAG_KEYS: tuple[str, ...] = (
 )
 
 # 1投稿のスコアに使える指標（config の score_weights_* のキーと対応）
-_RATE_METRICS = ("completion_rate", "share_rate", "follow_rate", "comment_rate")
+_RATE_METRICS = ("completion_rate", "share_rate", "save_rate", "follow_rate", "comment_rate")
 _NORMALIZED_METRICS = ("revenue_jpy", "roi", "cost_efficiency")
 
 # extract_winning_tags 入力の 1 レコード = (投稿の企画タグ等, {snapshot名: PerformanceSnapshot})
@@ -92,6 +92,9 @@ def _raw_metric_values(
     sr = snap.rate(snap.shares)
     if sr is not None:
         out["share_rate"] = _clamp01(sr)
+    svr = snap.rate(snap.saved)
+    if svr is not None:
+        out["save_rate"] = _clamp01(svr)
     cr = snap.rate(snap.comments)
     if cr is not None:
         out["comment_rate"] = _clamp01(cr)

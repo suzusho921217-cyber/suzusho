@@ -33,11 +33,12 @@ _ALIASES: dict[str, tuple[str, ...]] = {
     "likes": ("likes", "like_count", "favorites"),
     "comments": ("comments", "comment_count", "replies"),
     "shares": ("shares", "share_count", "reposts", "retweets"),
+    "saved": ("saved", "saves", "save_count"),
     "impressions": ("impressions", "impression_count"),
     "avg_watch_sec": ("avg_watch_sec", "average_view_duration_sec", "averageViewDuration"),
     "revenue_jpy": ("revenue_jpy", "estimated_revenue_jpy", "estimatedRevenue"),
 }
-_INT_FIELDS = {"views", "engaged_views", "likes", "comments", "shares", "impressions"}
+_INT_FIELDS = {"views", "engaged_views", "likes", "comments", "shares", "saved", "impressions"}
 
 
 def due_snapshots(
@@ -141,6 +142,7 @@ def collect_snapshot(
         likes=fields["likes"],
         comments=fields["comments"],
         shares=fields["shares"],
+        saved=fields["saved"],
         impressions=fields["impressions"],
         avg_watch_sec=fields["avg_watch_sec"],
         completion_rate=completion,
