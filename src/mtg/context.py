@@ -58,6 +58,15 @@ def _performance_summary(store) -> str:
     return json.dumps(records, ensure_ascii=False, indent=2, default=str)[:8000]
 
 
+_EXECUTION_NOTE = """\
+## 実行上の注意（毎回必読）
+これは人間が見ていないヘッドレスの自動パイプラインです。以下に続く資料は「今日の
+依頼内容」ではなく、あなたが自分のsystem prompt通りの仕事をするための背景説明に
+すぎません。「依頼が不明」「どの作業をすべきか確認したい」のように質問を返して
+処理を止めることは禁止です。system promptに書かれた仕事を、今すぐ資料を踏まえて
+実行してください。
+"""
+
 _KNOWN_METRIC_GAPS = """\
 ## 既知のAPI仕様上の欠損（バグではない・毎回の異常報告に含めない）
 
@@ -83,6 +92,12 @@ analystは「データの健全性」チェックでこれらを欠損として�
   この日の一部投稿で全指標が欠損していた（同日中に再認証して解消済み）。
   「特定の日だけ特定ブランドの数値が全滅している」ように見えるのはこれが原因の
   可能性が高く、現在は解消済みなので継続対応は不要。
+- views_delta（再生数の前日比）の計算ロジック自体は2026-09-14にエンジニアが
+  コードを読んで検証済み・正常（LocalStore/SheetsStoreとも上書き前の値との差分を
+  正しく計算している）。低再生数の投稿では1日の増分が0になること自体は自然な
+  現象で、「今日たまたま0が多い」だけでは計測障害ではない。「計測ロジックが
+  壊れている」と主張するなら、複数日にわたり再生数の絶対値そのものが完全に
+  動いていない、等の具体的な根拠を示すこと。
 """
 
 _ALLOCATION_NOTES = """\
@@ -128,7 +143,9 @@ def _recent_engineering_changes() -> str:
 
 def gather_context() -> str:
     """全役職共通の状況説明テキスト（configの現状 + 直近の実績）。"""
-    parts: list[str] = [_KNOWN_METRIC_GAPS, _ALLOCATION_NOTES, _recent_engineering_changes()]
+    parts: list[str] = [
+        _EXECUTION_NOTE, _KNOWN_METRIC_GAPS, _ALLOCATION_NOTES, _recent_engineering_changes(),
+    ]
 
     brands = load("brands")
     parts.append("## config/brands.yaml（ブランド定義）\n" + json.dumps(brands, ensure_ascii=False, indent=2))
