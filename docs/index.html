@@ -1,0 +1,243 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Moments Picks</title>
+<meta name="description" content="Cat Moments・Dog Momentsの動画で紹介したペット用品をまとめたリンク集">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🐾</text></svg>">
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Baloo+2:wght@500;600;700&family=Karla:wght@400;500;600;700&display=swap');
+
+  :root {
+    color-scheme: light;
+    --paper: #f2f4ee;
+    --paper-raised: #ffffff;
+    --ink: #2c2b26;
+    --ink-soft: #6b6a61;
+    --line: #dfe2d7;
+    --cat: #dd8a3a;
+    --cat-soft: #f6e6d1;
+    --dog: #2f6f62;
+    --dog-soft: #d9ebe6;
+    --accent: var(--cat);
+    --accent-soft: var(--cat-soft);
+    --accent-strong: #b9691f;
+    --shadow: 0 1px 2px rgba(44,43,38,0.06), 0 10px 22px -12px rgba(44,43,38,0.22);
+    --star: #c88a1a;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      color-scheme: dark;
+      --paper: #1b1c18; --paper-raised: #24251f; --ink: #efeee6; --ink-soft: #a7a597;
+      --line: #35362d; --cat: #f0a45c; --cat-soft: #3b2f1c; --dog: #5cab99; --dog-soft: #1c2f2a;
+      --accent-strong: #ffbb73;
+      --shadow: 0 1px 2px rgba(0,0,0,0.4), 0 10px 24px -12px rgba(0,0,0,0.65);
+      --star: #e0ab3f;
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --paper: #1b1c18; --paper-raised: #24251f; --ink: #efeee6; --ink-soft: #a7a597;
+    --line: #35362d; --cat: #f0a45c; --cat-soft: #3b2f1c; --dog: #5cab99; --dog-soft: #1c2f2a;
+    --accent-strong: #ffbb73;
+    --shadow: 0 1px 2px rgba(0,0,0,0.4), 0 10px 24px -12px rgba(0,0,0,0.65);
+    --star: #e0ab3f;
+  }
+
+  * { box-sizing: border-box; }
+  html, body { background: var(--paper); }
+  body {
+    margin: 0;
+    color: var(--ink);
+    font-family: 'Karla', sans-serif;
+    font-variant-numeric: tabular-nums;
+    padding-inline: 16px;
+    padding-block: 26px 60px;
+  }
+  .wrap { max-width: 560px; margin: 0 auto; }
+
+  header.top { text-align: center; margin-bottom: 20px; }
+  header.top .word {
+    font-family: 'Baloo 2', sans-serif; font-weight: 700; font-size: 1.9rem;
+    text-wrap: balance; letter-spacing: -0.01em;
+  }
+  header.top .tag { margin-top: 6px; color: var(--ink-soft); font-size: 0.92rem; }
+
+  .switcher {
+    display: flex; gap: 8px; background: var(--paper-raised); border: 1px solid var(--line);
+    border-radius: 999px; padding: 5px; margin-bottom: 20px; box-shadow: var(--shadow);
+    position: sticky; top: 10px; z-index: 5;
+  }
+  .switcher button {
+    flex: 1; border: none; background: transparent; font-family: 'Baloo 2', sans-serif;
+    font-weight: 600; font-size: 1rem; color: var(--ink-soft); padding: 10px 12px;
+    border-radius: 999px; cursor: pointer; transition: background .15s ease, color .15s ease;
+  }
+  .switcher button[aria-selected="true"] { background: var(--accent-soft); color: var(--ink); }
+  .switcher button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  .channel-strip {
+    display: flex; align-items: center; gap: 10px; margin-bottom: 16px;
+    padding: 12px 14px; background: var(--accent-soft); border-radius: 14px;
+  }
+  .channel-strip .emoji { font-size: 1.4rem; }
+  .channel-strip .meta { line-height: 1.3; }
+  .channel-strip .name { font-family: 'Baloo 2', sans-serif; font-weight: 600; font-size: 1rem; }
+  .channel-strip .sub { font-size: 0.82rem; color: var(--ink-soft); }
+
+  ul.list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 14px; }
+
+  .card {
+    background: var(--paper-raised); border: 1px solid var(--line); border-radius: 18px;
+    overflow: hidden; box-shadow: var(--shadow);
+  }
+  .card .photo {
+    position: relative; width: 100%; aspect-ratio: 4 / 3; background: var(--paper);
+    overflow: hidden;
+  }
+  .card .photo img {
+    width: 100%; height: 100%; object-fit: contain; display: block;
+  }
+  .card .photo .tag {
+    position: absolute; top: 10px; left: 10px;
+    font-size: 0.72rem; font-weight: 700; color: #fff; background: var(--accent);
+    padding: 4px 10px; border-radius: 999px; letter-spacing: 0.01em; box-shadow: var(--shadow);
+  }
+  .card .photo .date {
+    position: absolute; top: 10px; right: 10px;
+    font-size: 0.68rem; color: var(--ink-soft); background: var(--paper-raised);
+    padding: 3px 8px; border-radius: 999px; opacity: 0.9;
+  }
+  .card .body { padding: 14px 16px 16px; display: grid; gap: 8px; }
+  .card .name { font-family: 'Baloo 2', sans-serif; font-weight: 600; font-size: 1.08rem; text-wrap: balance; }
+  .card .pitch { font-size: 0.88rem; color: var(--ink-soft); line-height: 1.55; }
+  .card .meta-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .card .price { font-weight: 700; font-size: 1.15rem; }
+  .card .review { font-size: 0.8rem; color: var(--star); font-weight: 600; }
+  .card .provider {
+    font-size: 0.72rem; color: var(--ink-soft); border: 1px solid var(--line);
+    padding: 2px 7px; border-radius: 6px; margin-left: auto;
+  }
+  .card .actions { display: flex; gap: 8px; margin-top: 4px; }
+  .card a.btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 4px;
+    text-decoration: none; font-weight: 700; font-size: 0.92rem;
+    padding: 12px 14px; border-radius: 12px; white-space: nowrap;
+    transition: transform .1s ease, filter .15s ease;
+  }
+  .card a.btn:active { transform: scale(0.98); }
+  .card a.btn.buy {
+    flex: 1; background: var(--accent-strong); color: #fff;
+    box-shadow: 0 6px 14px -6px color-mix(in srgb, var(--accent-strong) 70%, transparent);
+  }
+  .card a.btn.buy:hover { filter: brightness(1.06); }
+  .card a.btn.watch {
+    background: transparent; color: var(--ink-soft); border: 1px solid var(--line); flex: 0 0 auto;
+  }
+
+  footer.note {
+    margin-top: 26px; text-align: center; font-size: 0.78rem; color: var(--ink-soft); line-height: 1.6;
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div class="word">Moments Picks</div>
+    <div class="tag">動画に出てきたアイテム、まとめて見つかります</div>
+  </header>
+
+  <div class="switcher" role="tablist" aria-label="ブランド切り替え">
+    <button id="tab-cat" role="tab" aria-selected="true">🐱 Cat Moments</button>
+    <button id="tab-dog" role="tab" aria-selected="false">🐶 Dog Moments</button>
+  </div>
+
+  <div class="channel-strip" id="strip"></div>
+
+  <ul class="list" id="list"></ul>
+
+  <footer class="note">
+    【PR】このページのリンクにはアフィリエイトリンクが含まれます。<br>
+    ※紹介動画はAIで生成・加工された合成コンテンツです。
+  </footer>
+</div>
+
+<script>
+  const ITEMS = [
+    {date:'2026-09-13', brand:'cat', video:'9bPEFguAu-0', tag:'そっくりさん', name:'パン型ペットベッド', pitch:'並べると本当に見分けがつかなくて毎回癒やされます。', price:3800, provider:'楽天', review:null, img:'https://shop.r10s.jp/acceljapan6520/cabinet/13620058/alb18216188ujhn_1.jpg', link:'https://hb.afl.rakuten.co.jp/hgc/g00tn7bo.9vicb003.g00tn7bo.9vicc838/?pc=https%3A%2F%2Fitem.rakuten.co.jp%2Facceljapan6520%2Fzbc3wgedy5ykuf22largd3l3ju-alb%2F&m=http%3A%2F%2Fm.rakuten.co.jp%2Facceljapan6520%2Fi%2F10235949%2F&rafcid=wsc_i_is_a1169e9c-4795-4478-b88a-153c61989a1c'},
+    {date:'2026-09-12', brand:'dog', video:'m0uDAv3fyAo', tag:'そっくりさん', name:'座り抱き枕(柴犬のコタロウ)', pitch:'毛色がそっくりで、届いた時にうちも二度見しました。', price:1891, provider:'Amazon', review:'★4.7(986件)', img:'https://m.media-amazon.com/images/W/BW_MEDIAX_AVIF_MEASUREMENT_1306696-T3/images/I/61hITWi279L._AC_SX679_.jpg', link:'https://www.amazon.co.jp/dp/B07MP4KS4C?tag=catdogmoments-22'},
+    {date:'2026-09-12', brand:'cat', video:'4kqfdF9Krc0', tag:'あるある', name:'S字トンネル', pitch:'出たり入ったりを繰り返す様子はまさに猫あるあるです。', price:2280, provider:'楽天', review:'773件のレビュー', img:'https://shop.r10s.jp/nagaipet/cabinet/05373044/05668159/06750118/1-1.jpg', link:'https://hb.afl.rakuten.co.jp/hgc/g00sq1go.9vicbee6.g00sq1go.9vicc151/?pc=https%3A%2F%2Fitem.rakuten.co.jp%2Fnagaipet%2Fajd0033%2F&m=http%3A%2F%2Fm.rakuten.co.jp%2Fnagaipet%2Fi%2F10000759%2F&rafcid=wsc_i_is_a1169e9c-4795-4478-b88a-153c61989a1c'},
+    {date:'2026-09-11', brand:'dog', video:'u5LqcttkgTk', tag:'気づいたら', name:'クッションベッド(大型犬用)', pitch:'大型犬サイズでも余裕がある広さがお気に入りです。', price:6900, provider:'楽天', review:null, img:'https://shop.r10s.jp/ventduprintemps/cabinet/09411995/p-xd178/1.jpg', link:'https://hb.afl.rakuten.co.jp/hgc/g00u8ljo.9vicb4a5.g00u8ljo.9vicc4c9/?pc=https%3A%2F%2Fitem.rakuten.co.jp%2Fventduprintemps%2Fp-xd178%2F&m=http%3A%2F%2Fm.rakuten.co.jp%2Fventduprintemps%2Fi%2F10000261%2F&rafcid=wsc_i_is_a1169e9c-4795-4478-b88a-153c61989a1c'},
+    {date:'2026-09-11', brand:'cat', video:'IK6o0e-p5Rk', tag:'気づいたら', name:'ブラッシンググローブ NADENADE', pitch:'長毛の子でも撫でるだけで毛が取れて楽になりました。', price:1180, provider:'Amazon', review:'★4.1(134件)', img:'https://m.media-amazon.com/images/W/BW_MEDIAX_AVIF_MEASUREMENT_1306696-T3/images/I/71SuutgYrAL._AC_SY300_SX300_QL70_ML2_.jpg', link:'https://www.amazon.co.jp/dp/B0FSCZ2SJW?tag=catdogmoments-22'},
+    {date:'2026-09-10', brand:'dog', video:'nd6TM46QeDA', tag:'全力空回り', name:'音が出るボール(橙)', pitch:'庭や公園での全力ダッシュにちょうど良いサイズです。', price:1099, provider:'Amazon', review:'★4.0(368件)', img:'https://m.media-amazon.com/images/W/BW_MEDIAX_AVIF_MEASUREMENT_1306696-T3/images/I/61xt4-No2jL._AC_SX679_.jpg', link:'https://www.amazon.co.jp/dp/B09LHFSN18?tag=catdogmoments-22'},
+    {date:'2026-09-10', brand:'cat', video:'FZt5ISwvOOg', tag:'昼寝あけドラマ', name:'オーダーメイド抱き枕クッション', pitch:'転がってもすぐ引き寄せて二度寝しています。', price:1940, provider:'楽天', review:'128件のレビュー', img:'https://shop.r10s.jp/lucirwork/cabinet/zxcv12231/zxcv122311230_1.jpg', link:'https://hb.afl.rakuten.co.jp/hgc/g00utupo.9vicba2b.g00utupo.9vicc3e2/?pc=https%3A%2F%2Fitem.rakuten.co.jp%2Flucirwork%2Fzxcv122311230%2F&m=http%3A%2F%2Fm.rakuten.co.jp%2Flucirwork%2Fi%2F10000014%2F&rafcid=wsc_i_is_a1169e9c-4795-4478-b88a-153c61989a1c'},
+    {date:'2026-09-09', brand:'cat', video:'czumHxJ1j0w', tag:'人間くさい', name:'にゃんプレボウル', pitch:'水分補給の量が見えるので、健康管理にも役立っています。', price:1980, provider:'A8.net', review:null, img:'https://shop.hariocorp.co.jp/cdn/shop/files/PTS-NYB-W_1200x1200.jpg?v=1736227742', link:'https://px.a8.net/svt/ejp?a8mat=4BCA7B+4NW9DE+4XPI+BW0YB&a8ejpredirect=https%3A%2F%2Fshop.hariocorp.co.jp%2Fproducts%2Fpts-nyb&a8sns=youtube'},
+    {date:'2026-09-08', brand:'dog', video:'LDzDvEf6vck', tag:'二段オチ', name:'牛革ロープトイ', pitch:'丈夫な作りで子犬の甘噛み期にも重宝しています。', price:984, provider:'Amazon', review:'★3.8(28件)', img:'https://m.media-amazon.com/images/W/BW_MEDIAX_AVIF_MEASUREMENT_1306696-T3/images/I/71gd6VV5BsL._AC_SX679_.jpg', link:'https://www.amazon.co.jp/dp/B09S5XYNL3?tag=catdogmoments-22'},
+    {date:'2026-09-08', brand:'cat', video:'MxEY2BGDAWM', tag:'人間くさい', name:'リボン付き首輪', pitch:'着けるだけで表情が一気に大人びて見えます。', price:1200, provider:'Amazon', review:'★4.0(276件)', img:'https://m.media-amazon.com/images/W/BW_MEDIAX_AVIF_MEASUREMENT_1306696-T3/images/I/51vBA4E-zDL._AC_SY300_SX300_QL70_ML2_.jpg', link:'https://www.amazon.co.jp/dp/B07458YK4Q?tag=catdogmoments-22'},
+    {date:'2026-09-07', brand:'cat', video:'SF7zAIhz0mA', tag:'二段オチ', name:'ペットステップ 2段', pitch:'段差が低めで、足の短い子でも使いやすい作りです。', price:5280, provider:'楽天', review:'1,231件のレビュー', img:'https://shop.r10s.jp/smile88/cabinet/master/1st/a08263.jpg', link:'https://hb.afl.rakuten.co.jp/hgc/g00q6peo.9vicb56b.g00q6peo.9viccb05/?pc=https%3A%2F%2Fitem.rakuten.co.jp%2Fsmile88%2Fa08263%2F&m=http%3A%2F%2Fm.rakuten.co.jp%2Fsmile88%2Fi%2F10058113%2F&rafcid=wsc_i_is_a1169e9c-4795-4478-b88a-153c61989a1c'},
+    {date:'2026-09-07', brand:'cat', video:'DHSumsmuI8Q', tag:'予想外のサイズ感', name:'低反発マットレス', pitch:'大判サイズで、寝相の悪さもしっかり受け止めてくれます。', price:2670, provider:'楽天', review:null, img:'https://shop.r10s.jp/dog-kan/cabinet/11076425/12762690/7305269-e.jpg', link:'https://hb.afl.rakuten.co.jp/hgc/g00pr3zo.9vicb40c.g00pr3zo.9vicceca/?pc=https%3A%2F%2Fitem.rakuten.co.jp%2Fdog-kan%2F7305267%2F&m=http%3A%2F%2Fm.rakuten.co.jp%2Fdog-kan%2Fi%2F10201830%2F&rafcid=wsc_i_is_a1169e9c-4795-4478-b88a-153c61989a1c'},
+    {date:'2026-09-06', brand:'dog', video:'1rHR8JCXfrA', tag:'タイミングの奇跡', name:'スカーフバンダナ(グリーン)', pitch:'首元に一つあるだけで、お出かけ写真が締まります。', price:693, provider:'Amazon', review:'★3.8(22件)', img:'https://m.media-amazon.com/images/W/BW_MEDIAX_AVIF_MEASUREMENT_1306696-T3/images/I/51SlqRkwTKL._AC_.jpg', link:'https://www.amazon.co.jp/dp/B086VXG8T9?tag=catdogmoments-22'},
+    {date:'2026-09-06', brand:'cat', video:'_psD96-8bZc', tag:'二段オチ', name:'ドーム型ベッド', pitch:'すっぽり入れる形が気に入っているようで、よく中で丸くなっています。', price:3380, provider:'楽天', review:'435件のレビュー', img:'https://shop.r10s.jp/mtgrace/cabinet/13448499/imgrc0118995410.jpg', link:'https://hb.afl.rakuten.co.jp/hgc/g00snh8o.9vicb3ca.g00snh8o.9vicc4f5/?pc=https%3A%2F%2Fitem.rakuten.co.jp%2Fmtgrace%2Fpetbeds-yp004%2F&m=http%3A%2F%2Fm.rakuten.co.jp%2Fmtgrace%2Fi%2F10041306%2F&rafcid=wsc_i_is_a1169e9c-4795-4478-b88a-153c61989a1c'},
+    {date:'2026-09-06', brand:'cat', video:'PUI7qEur5sA', tag:'予想外のサイズ感', name:'木製キャットタワー(ミニ)', pitch:'ナチュラルな色味でお部屋にも馴染みます。', price:6998, provider:'楽天', review:'66件のレビュー', img:'https://shop.r10s.jp/miki-tomo/cabinet/09487681/ck1312-10.jpg', link:'https://hb.afl.rakuten.co.jp/hgc/g00u12to.9vicbd52.g00u12to.9viccb99/?pc=https%3A%2F%2Fitem.rakuten.co.jp%2Fmiki-tomo%2Fck1312%2F&m=http%3A%2F%2Fm.rakuten.co.jp%2Fmiki-tomo%2Fi%2F10000873%2F&rafcid=wsc_i_is_a1169e9c-4795-4478-b88a-153c61989a1c'},
+    {date:'2026-09-06', brand:'cat', video:'Ilnt3PdUuek', tag:'予想させる', name:'ペットブランケット 3枚セット', pitch:'肌触りが良く、くるまるとすぐお昼寝モードに入ります。', price:1290, provider:'Amazon', review:'★4.0(342件)', img:'https://m.media-amazon.com/images/W/BW_MEDIAX_AVIF_MEASUREMENT_1306696-T3/images/I/61G2m18dFRL._AC_SY300_SX300_QL70_ML2_.jpg', link:'https://www.amazon.co.jp/dp/B09H6STXH2?tag=catdogmoments-22'},
+    {date:'2026-09-05', brand:'cat', video:'luquIWRAmuY', tag:'二段オチ', name:'猫草栽培セット', pitch:'背景に置いている観葉植物、実は猫草栽培セットです。', price:1200, provider:'Amazon', review:'★4.1(30件)', img:'https://m.media-amazon.com/images/W/BW_MEDIAX_AVIF_MEASUREMENT_1306696-T3/images/I/611jHlR8x9L._AC_SX679_.jpg', link:'https://www.amazon.co.jp/dp/B08KPNPMVY?tag=catdogmoments-22'},
+    {date:'2026-09-05', brand:'dog', video:'mQmeSDUdXvw', tag:'そっくりさん', name:'木製フードボウルスタンド', pitch:'食卓まわりがナチュラルな雰囲気になるので愛用しています。', price:2970, provider:'楽天', review:'511件のレビュー', img:'https://shop.r10s.jp/idog/cabinet/std/li036s_s00.jpg', link:'https://hb.afl.rakuten.co.jp/hgc/g00pwhco.9vicbd0c.g00pwhco.9viccf07/?pc=https%3A%2F%2Fitem.rakuten.co.jp%2Fidog%2Fli036-s%2F&m=http%3A%2F%2Fm.rakuten.co.jp%2Fidog%2Fi%2F10003507%2F&rafcid=wsc_i_is_a1169e9c-4795-4478-b88a-153c61989a1c'},
+  ];
+
+  const BRANDS = {
+    cat: {label:'Cat Moments', emoji:'🐱', sub:'動画で紹介したアイテム、新しい順'},
+    dog: {label:'Dog Moments', emoji:'🐶', sub:'動画で紹介したアイテム、新しい順'},
+  };
+
+  const root = document.documentElement;
+  const list = document.getElementById('list');
+  const strip = document.getElementById('strip');
+  const tabCat = document.getElementById('tab-cat');
+  const tabDog = document.getElementById('tab-dog');
+
+  function fmtPrice(n) { return '¥' + n.toLocaleString('ja-JP'); }
+
+  function render(brand) {
+    root.style.setProperty('--accent', brand === 'cat' ? 'var(--cat)' : 'var(--dog)');
+    root.style.setProperty('--accent-soft', brand === 'cat' ? 'var(--cat-soft)' : 'var(--dog-soft)');
+    root.style.setProperty('--accent-strong', brand === 'cat' ? '#b9691f' : '#1f4f45');
+
+    tabCat.setAttribute('aria-selected', String(brand === 'cat'));
+    tabDog.setAttribute('aria-selected', String(brand === 'dog'));
+
+    const b = BRANDS[brand];
+    strip.innerHTML = `<span class="emoji">${b.emoji}</span><span class="meta"><span class="name">${b.label}</span><span class="sub">${b.sub}</span></span>`;
+
+    const items = ITEMS.filter(i => i.brand === brand);
+    list.innerHTML = items.map(i => `
+      <li class="card">
+        <div class="photo">
+          <img src="${i.img}" alt="${i.name}" loading="lazy">
+          <span class="tag">${i.tag}</span>
+          <span class="date">${i.date}</span>
+        </div>
+        <div class="body">
+          <div class="name">${i.name}</div>
+          <div class="pitch">${i.pitch}</div>
+          <div class="meta-row">
+            <span class="price">${fmtPrice(i.price)}</span>
+            ${i.review ? `<span class="review">${i.review}</span>` : ''}
+            <span class="provider">${i.provider}</span>
+          </div>
+          <div class="actions">
+            <a class="btn buy" href="${i.link}" target="_blank" rel="noopener sponsored">今すぐ見てみる →</a>
+            <a class="btn watch" href="https://www.youtube.com/shorts/${i.video}" target="_blank" rel="noopener">▶ 動画</a>
+          </div>
+        </div>
+      </li>
+    `).join('');
+  }
+
+  tabCat.addEventListener('click', () => render('cat'));
+  tabDog.addEventListener('click', () => render('dog'));
+
+  render('cat');
+</script>
+</body>
+</html>
