@@ -37,7 +37,7 @@ brands:
     oddity_level: [1, 2]            # 基本は自然。「そっくりさん」等だけ 2
 
   dog:
-    characters: [dog_golden_retriever, dog_corgi, dog_pomeranian, dog_french_bulldog, dog_toy_poodle, dog_shiba, dog_beagle]
+    characters: [dog_golden_retriever, dog_corgi, dog_pomeranian, dog_french_bulldog, dog_toy_poodle, dog_shiba, dog_beagle, dog_chihuahua]
     policy_risk: LOW
     concept_tags:
     - "二段オチ"
