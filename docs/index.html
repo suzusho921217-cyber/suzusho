@@ -59,11 +59,11 @@
 
   header.top { text-align: center; margin-bottom: 20px; }
   .hero {
-    width: 100%; aspect-ratio: 16 / 5; border-radius: 20px; overflow: hidden;
+    width: 100%; aspect-ratio: 1707 / 282; border-radius: 20px; overflow: hidden;
     margin-bottom: 16px; box-shadow: var(--shadow); background: var(--accent-soft);
   }
   .hero img {
-    width: 100%; height: 100%; object-fit: cover; object-position: center 42%;
+    width: 100%; height: 100%; object-fit: cover; object-position: center;
     display: block; transition: opacity .2s ease;
   }
   header.top .word {
@@ -195,10 +195,8 @@
   ];
 
   const BRANDS = {
-    cat: {label:'Cat Moments', emoji:'🐱', sub:'動画で紹介したアイテム、新しい順',
-          hero:'https://yt3.googleusercontent.com/c4GakAR2_UmcWusqHmJkag_KJl6rQqVrN9MbwNL2mKUFMZkrdK1su5jN2l9WTWODWQCfcOUF0kE=w1200'},
-    dog: {label:'Dog Moments', emoji:'🐶', sub:'動画で紹介したアイテム、新しい順',
-          hero:'https://yt3.googleusercontent.com/bvN4bHVzuZRV-eSU0YnZ0u5IGkI6w5byVsUibGw5fOp9QySF-FHb2XWFpBb6HbSVOazwmV1xFg=w1200'},
+    cat: {label:'Cat Moments', emoji:'🐱', sub:'動画で紹介したアイテム、新しい順', hero:'assets/hero-cat.jpg'},
+    dog: {label:'Dog Moments', emoji:'🐶', sub:'動画で紹介したアイテム、新しい順', hero:'assets/hero-dog.jpg'},
   };
 
   const root = document.documentElement;
@@ -227,7 +225,7 @@
     list.innerHTML = items.map(i => `
       <li class="card">
         <div class="photo">
-          <img src="${i.img}" alt="${i.name}" loading="lazy">
+          <img src="${i.img}" alt="${i.name}" loading="lazy" referrerpolicy="no-referrer">
           <span class="tag">${i.tag}</span>
           <span class="date">${i.date}</span>
         </div>
