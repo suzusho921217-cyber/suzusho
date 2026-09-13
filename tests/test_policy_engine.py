@@ -40,14 +40,14 @@ def test_load_policy_merges_common_and_platform():
     ids = {c["id"] for c in pol["checks"]}
     assert "no_real_person_mimicry" in ids      # _common 由来
     assert "yt_oddity_cap" in ids               # youtube 由来
-    assert policy_version(Platform.YOUTUBE) == "2026-08-30"
+    assert policy_version(Platform.YOUTUBE) == "2026-09-13"
 
 
 def test_clean_plan_passes():
     res = check_prompt(_plan(), Platform.YOUTUBE)
     assert res.decision is PolicyDecision.PASS
     assert res.reasons == []
-    assert res.policy_version == "2026-08-30"
+    assert res.policy_version == "2026-09-13"
 
 
 def test_real_person_mimicry_holds():
@@ -131,6 +131,6 @@ def test_is_policy_stale_version_mismatch(tmp_path, monkeypatch):
 def test_is_policy_stale_matching_version_false(tmp_path, monkeypatch):
     monkeypatch.setattr(engine, "STATE_DIR", tmp_path)
     (tmp_path / "policy_sync.json").write_text(
-        json.dumps({"youtube": {"version": "2026-08-30", "stale": False}}), encoding="utf-8"
+        json.dumps({"youtube": {"version": "2026-09-13", "stale": False}}), encoding="utf-8"
     )
     assert is_policy_stale(Platform.YOUTUBE) is False
