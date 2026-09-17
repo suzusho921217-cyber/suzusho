@@ -12,11 +12,13 @@ cat:
   youtube:
     always: ["#Shorts", "#猫", "#cat", "#cats"]
     pool:
+    - '#Shorts'
     - '#猫'
     - '#cat'
-    - '#catsoftiktok'
-    - '#ねこあるある'
+    - '#cats'
     - '#かわいい'
+    - '#ねこあるある'
+    - '#catsoftiktok'
     per_video: 4
   tiktok:
     always: ["#猫", "#cat", "#catsoftiktok", "#fyp"]
@@ -40,11 +42,13 @@ dog:
   youtube:
     always: ["#Shorts", "#犬", "#dog", "#dogs"]
     pool:
-    - '#わんこ'
+    - '#Shorts'
+    - '#犬'
     - '#dog'
+    - '#dogs'
+    - '#かわいい'
+    - '#わんこ'
     - '#dogsoftiktok'
-    - '#コーギー'
-    - '#柴犬'
     per_video: 4
   tiktok:
     always: ["#犬", "#dog", "#dogsoftiktok", "#fyp"]
