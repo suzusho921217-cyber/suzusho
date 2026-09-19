@@ -96,7 +96,11 @@ def run() -> MtgResult:
     analyst_out = call_role(roles.ANALYST_SYSTEM, context)
     result.transcripts["analyst"] = analyst_out
 
-    researcher_out = call_role(roles.RESEARCHER_SYSTEM, context, with_web_search=True)
+    from .outliers import gather_outlier_report
+
+    outlier_report = gather_outlier_report()
+    researcher_input = f"{context}\n\n## 異常値PV動画（YouTube Data APIの実測）\n{outlier_report}"
+    researcher_out = call_role(roles.RESEARCHER_SYSTEM, researcher_input, with_web_search=True)
     result.transcripts["researcher"] = researcher_out
 
     marketer_input = (
