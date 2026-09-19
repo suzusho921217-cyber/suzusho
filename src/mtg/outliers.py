@@ -2,7 +2,7 @@
 
 異常値 = 再生数 ÷ チャンネル登録者数（登録者が少ないのに大きく伸びた＝企画・フックの力で
 伸びた動画）。登録者が少なすぎる場合は下限(_MIN_SUBS)で割り、極小チャンネルの過大評価を防ぐ。
-YOUTUBE_API_KEY が無い/APIが失敗した場合は空の報告を返し、MTG全体は止めない。
+YOUTUBE_API_KEY もOAuthも無い/APIが失敗した場合は空の報告を返し、MTG全体は止めない。
 """
 
 from __future__ import annotations
@@ -27,8 +27,27 @@ _MAX_SECONDS = 61
 _TOP_N = 10
 
 
+def _oauth_token() -> str | None:
+    """投稿用のYouTube OAuth（youtube.readonly含む）から読み取り用アクセストークンを得る。"""
+    cid, secret = env("YOUTUBE_OAUTH_CLIENT_ID"), env("YOUTUBE_OAUTH_CLIENT_SECRET")
+    refresh = env("YOUTUBE_OAUTH_REFRESH_TOKEN_CAT") or env("YOUTUBE_OAUTH_REFRESH_TOKEN")
+    if not (cid and secret and refresh):
+        return None
+    r = requests.post(
+        "https://oauth2.googleapis.com/token", timeout=20,
+        data={"client_id": cid, "client_secret": secret, "refresh_token": refresh,
+              "grant_type": "refresh_token"},
+    )
+    r.raise_for_status()
+    return r.json()["access_token"]
+
+
 def _get(path: str, key: str, **params) -> dict:
-    r = requests.get(f"{_BASE}/{path}", params={**params, "key": key}, timeout=20)
+    """key が "Bearer <token>" ならOAuth、それ以外はAPIキーとして扱う。"""
+    if key.startswith("Bearer "):
+        r = requests.get(f"{_BASE}/{path}", params=params, headers={"Authorization": key}, timeout=20)
+    else:
+        r = requests.get(f"{_BASE}/{path}", params={**params, "key": key}, timeout=20)
     r.raise_for_status()
     return r.json()
 
@@ -100,10 +119,13 @@ def format_report(items: list[dict]) -> str:
 
 def gather_outlier_report() -> str:
     """MTGに渡す実測レポート。失敗してもMTGは止めず、その旨を文面に残す。"""
-    key = env("YOUTUBE_API_KEY")
-    if not key:
-        return format_report([])
     try:
+        key = env("YOUTUBE_API_KEY")
+        if not key:
+            token = _oauth_token()
+            key = f"Bearer {token}" if token else None
+        if not key:
+            return format_report([])
         return format_report(collect_outliers(key))
     except Exception as e:  # noqa: BLE001 - 外部API障害でMTG全体を止めない
         return f"（異常値動画の取得に失敗: {type(e).__name__}: {e}）"
