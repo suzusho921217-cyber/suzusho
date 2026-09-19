@@ -26,10 +26,13 @@ cat:
     always: ["#猫", "#cat", "#catstagram", "#catsofinstagram"]
     pool:
     - '#猫'
+    - '#cat'
+    - '#catstagram'
+    - '#catsofinstagram'
     - '#kitten'
     - '#かわいい'
-    - '#ねこら部'
-    - '#短毛猫'
+    - '#ぬいぐるみ猫'
+    - '#擬人化猫'
     per_video: 6
   x:
     always: ["#猫", "#cat"]
