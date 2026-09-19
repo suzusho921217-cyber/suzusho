@@ -48,6 +48,9 @@ WINNING_TAG_KEYS: tuple[str, ...] = (
     "platform",
 )
 
+# 予備ルート（粗い集計）のキー
+_COARSE_KEYS: tuple[str, ...] = ("brand", "platform", "concept_tag", "hook_type")
+
 # 1投稿のスコアに使える指標（config の score_weights_* のキーと対応）
 _RATE_METRICS = ("completion_rate", "share_rate", "save_rate", "follow_rate", "comment_rate")
 _NORMALIZED_METRICS = ("revenue_jpy", "roi", "cost_efficiency")
@@ -232,6 +235,9 @@ def extract_winning_tags(
 
     # tagタプル -> [(score, age_days), ...]
     groups: dict[tuple, list[tuple[float, float]]] = {}
+    # 粗い集計（ブランド×媒体×企画×フック）。9項目が全部一致する組は探索運用だとほぼ
+    # 3本に届かず勝ちタグが0件になるため、粒度を落とした予備ルートで補う。
+    coarse_groups: dict[tuple, list[tuple[float, float, tuple]]] = {}
     for post, snaps in records:
         snap = pick_snapshot(snaps, snapshot_order)
         if snap is None:
@@ -252,6 +258,8 @@ def extract_winning_tags(
         )
         key = tuple(_tag_value(k, post.get(k)) for k in WINNING_TAG_KEYS)
         groups.setdefault(key, []).append((score, age_days))
+        coarse = tuple(_tag_value(k, post.get(k)) for k in _COARSE_KEYS)
+        coarse_groups.setdefault(coarse, []).append((score, age_days, key))
 
     winners: list[dict] = []
     for key, scored in groups.items():
@@ -271,6 +279,28 @@ def extract_winning_tags(
         combined = sum(v * w for v, w in parts) / wsum
 
         winners.append({**dict(zip(WINNING_TAG_KEYS, key)), "score": round(combined, 6)})
+
+    # 予備ルート: 厳密な勝ちタグに含まれない粗い組を、最頻の残り項目で補う
+    covered = {tuple(_tag_value(k, w.get(k)) for k in _COARSE_KEYS) for w in winners}
+    for coarse, scored in coarse_groups.items():
+        if coarse in covered:
+            continue
+        within_30 = [(sc, age, key) for sc, age, key in scored if age <= 30.0]
+        if len(within_30) < min_posts:
+            continue
+        within_7 = [sc for sc, age, _ in within_30 if age <= 7.0]
+        parts = [(statistics.median([sc for sc, _, _ in within_30]), win_weights["30"])]
+        if within_7:
+            parts.append((statistics.median(within_7), win_weights["7"]))
+        wsum = sum(w for _, w in parts)
+        if wsum <= 0:
+            continue
+        combined = sum(v * w for v, w in parts) / wsum
+        # 残り項目は、その組で最も多く使われた値（再現できる形にする）
+        keys = [key for _, _, key in within_30]
+        full = {k: statistics.mode([key[i] for key in keys]) for i, k in enumerate(WINNING_TAG_KEYS)}
+        full.update(dict(zip(_COARSE_KEYS, coarse)))
+        winners.append({**full, "score": round(combined, 6)})
 
     winners.sort(
         key=lambda w: (-w["score"], tuple(str(w[k]) for k in WINNING_TAG_KEYS))

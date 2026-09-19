@@ -242,3 +242,23 @@ def test_next_day_allocation_is_planner_reexport():
     from src.planner.planner import next_day_allocation as planner_alloc
 
     assert engine.next_day_allocation is planner_alloc
+
+
+def test_extract_winning_tags_coarse_fallback_when_fine_groups_sparse():
+    # 企画・フックは同じだが、リアリティ/違和感/尺がバラバラ（探索運用）→ 細かい集計だと0件
+    records = [
+        _rec({**TAG_A, "reality_level": 3, "duration_target_sec": 8}, 2, 0.8),
+        _rec({**TAG_A, "reality_level": 4, "duration_target_sec": 10}, 3, 0.7),
+        _rec({**TAG_A, "reality_level": 4, "oddity_level": 3}, 4, 0.6),
+    ]
+    winners = extract_winning_tags(records, CONFIG, now=NOW)
+    assert len(winners) == 1
+    w = winners[0]
+    assert set(w) == set(WINNING_TAG_KEYS) | {"score"}
+    assert (w["concept_tag"], w["hook_type"]) == ("違和感", "0.5秒異常")
+    assert w["reality_level"] == 4  # 最頻値
+
+
+def test_extract_winning_tags_coarse_fallback_does_not_duplicate_strict():
+    records = [_rec(TAG_A, 2, 0.8), _rec(TAG_A, 3, 0.6), _rec(TAG_A, 4, 0.4)]
+    assert len(extract_winning_tags(records, CONFIG, now=NOW)) == 1
