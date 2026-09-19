@@ -80,6 +80,7 @@ from src.policy.engine import check_prompt, policy_version
 from src.policy.policy_sync import check_feeds
 from src.publishers.base import PublishRequest
 from src.publishers.dryrun import DryRunPublisher
+from src.publishers.copywriter import write_copy
 from src.publishers.hashtags import select_caption_cta, select_hashtags
 from src.publishers.pipeline import PublishOutcome, decide_and_publish
 from src.publishers.registry import get_publisher
@@ -668,15 +669,19 @@ def cmd_publish(args: argparse.Namespace) -> int:
                 )
                 cta = select_caption_cta(plan.concept_tag, date=date)
                 species = {"cat": "子猫", "dog": "子犬"}.get(plan.brand.value, "")
+                title = f"{plan.concept_tag}｜{plan.hook_type}"
                 caption = f"{plan.concept_tag}な{species}"
                 if cta:
                     caption += f"\n\n{cta}"
+                written = write_copy(plan, platform.value) if mode != "dryrun" else None
+                if written:  # 競合の型を参考にしたAI生成。失敗時は従来テンプレート
+                    title, caption = written[0], written[1]
                 caption += f"\n\n{' '.join(tags)}"
                 req = PublishRequest(
                     post=post,
                     video_path=variants.get(f"{plan.plan_id}|{platform.value}")
                     or jd.get("local_path") or "",
-                    title=f"{plan.concept_tag}｜{plan.hook_type}",
+                    title=title,
                     caption=caption.strip(),
                     tags=tags,
                 )

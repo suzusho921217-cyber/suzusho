@@ -117,6 +117,16 @@ def format_report(items: list[dict]) -> str:
     return "\n".join(lines)
 
 
+def _save(items: list[dict]) -> None:
+    """投稿時のタイトル/本文づくり（publishers.copywriter）が参照できるよう保存する。"""
+    import json
+    from pathlib import Path
+
+    p = Path(__file__).resolve().parents[2] / ".state" / "outliers.json"
+    p.parent.mkdir(parents=True, exist_ok=True)
+    p.write_text(json.dumps(items, ensure_ascii=False, indent=1), encoding="utf-8")
+
+
 def gather_outlier_report() -> str:
     """MTGに渡す実測レポート。失敗してもMTGは止めず、その旨を文面に残す。"""
     try:
@@ -126,6 +136,8 @@ def gather_outlier_report() -> str:
             key = f"Bearer {token}" if token else None
         if not key:
             return format_report([])
-        return format_report(collect_outliers(key))
+        items = collect_outliers(key)
+        _save(items)
+        return format_report(items)
     except Exception as e:  # noqa: BLE001 - 外部API障害でMTG全体を止めない
         return f"（異常値動画の取得に失敗: {type(e).__name__}: {e}）"

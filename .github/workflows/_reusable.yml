@@ -44,6 +44,7 @@ jobs:
           STATE_SYNC: "1"
           VIDEO_PROVIDER: ${{ vars.VIDEO_PROVIDER }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}   # VIDEO_PROVIDER=veo（§12）
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}  # 投稿タイトル/本文のAI生成（copywriter）
           PUBLISH_MODE: ${{ vars.PUBLISH_MODE }}          # 未設定なら dryrun
           SHEETS_BACKEND: ${{ vars.SHEETS_BACKEND }}      # 未設定なら local
           YOUTUBE_OAUTH_CLIENT_ID: ${{ secrets.YOUTUBE_OAUTH_CLIENT_ID }}
