@@ -19,7 +19,7 @@ def test_returns_none_without_api_key(monkeypatch):
 
 def test_returns_none_on_api_failure(monkeypatch):
     monkeypatch.setattr(copywriter, "env", lambda *a, **k: "key")
-    import src.mtg.client as client
+    from src.mtg import client
 
     def boom(*a, **k):
         raise RuntimeError("api down")
@@ -30,7 +30,7 @@ def test_returns_none_on_api_failure(monkeypatch):
 
 def test_parses_json_reply(monkeypatch):
     monkeypatch.setattr(copywriter, "env", lambda *a, **k: "key")
-    import src.mtg.client as client
+    from src.mtg import client
 
     monkeypatch.setattr(
         client, "call_role",
