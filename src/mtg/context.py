@@ -156,6 +156,19 @@ def _recent_engineering_changes() -> str:
     return "## 直近のエンジニアリング変更（コミットログ、直近14日）\n" + out[:4000]
 
 
+_FACT_CORRECTIONS = """\
+## 事実の訂正（2026-09-19、エンジニア確認済み。過去ログより優先）
+- min_posts_for_winner は 3 が実際の設定値（60ではない。60という数字はどの設定にも存在しない）。
+  「60への反映確認」「2026-09-22の統計基準確定」を待つ必要は無い。
+- winning_tags が0件だった原因は、9項目が全部一致する投稿を3本集める集計が細かすぎたこと。
+  2026-09-19に「ブランド×媒体×企画×フック」の予備集計を追加して修正済み（勝ちタグは出るようになった）。
+  「学習ロジックの原因調査が終わるまで新規企画を保留」は不要。
+- 2026-09-19に手動でサンプル動画8本（猫2・犬2 × YouTube/Instagram）を投稿済み（学習からは除外）。
+- 過去ログの「2026-09-22まで現状維持/保留」は、2026-09-19のユーザー指示（模倣最優先・保留禁止）で
+  無効になった。review_date までの待機を理由にしない。
+"""
+
+
 def gather_context() -> str:
     """全役職共通の状況説明テキスト（configの現状 + 直近の実績）。"""
     parts: list[str] = [
@@ -184,6 +197,17 @@ def gather_context() -> str:
     if plan_path is not None:
         plan = _read_json(plan_path)
         parts.append(f"## {plan_path.name}（直近の配分・企画）\n" + json.dumps(plan, ensure_ascii=False, indent=2)[:4000])
+
+    scoring = load("scoring")
+    parts.append(
+        "## config/scoring.yaml（勝ちタグ判定の実際の設定値。★これが正。過去ログや会議中の別の数値"
+        "（例: min_posts_for_winner=60）は誤り）\n"
+        + json.dumps(
+            {"learning": scoring.get("learning"), "allocation": scoring.get("allocation")},
+            ensure_ascii=False, indent=2,
+        )
+    )
+    parts.append(_FACT_CORRECTIONS)
 
     budget = load("budget")
     parts.append("## config/budget.yaml（予算上限。monthly_budget は絶対に超えない）\n" + json.dumps(budget, ensure_ascii=False, indent=2))

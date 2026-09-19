@@ -380,3 +380,16 @@ ANALYST_SYSTEM = MIMIC_POLICY + "\n" + ANALYST_SYSTEM
 MARKETER_SYSTEM = MIMIC_POLICY + "\n" + MARKETER_SYSTEM
 CRITIC_SYSTEM = MIMIC_POLICY + "\n" + CRITIC_SYSTEM
 COORDINATOR_SYSTEM = MIMIC_POLICY + "\n" + COORDINATOR_SYSTEM
+
+
+# 統括の最終確認（出力の直前に効かせるため末尾に置く）。2026-09-19: 「9/22まで現状維持」の再発対策
+COORDINATOR_SYSTEM += """
+
+★最終確認（出力前に必ず守る。違反する出力は不可）:
+- decision に「現状維持」「〜日まで待機/保留」「〜の確認が取れてから」は書かない。
+- auto_apply に、異常値動画の型を真似た企画・フックの追加（add_concept_tag / add_hook_type）または
+  ハッシュタグ・探索比率の変更を、最低1件必ず入れる。0件は不可。
+- 「confidence」が低い/データ不足でも、上の2点は変わらない。
+- 資料の「config/scoring.yaml」「事実の訂正」に書かれた数値・事実が、過去ログの記述と食い違う場合は
+  資料側を採用する。
+"""
