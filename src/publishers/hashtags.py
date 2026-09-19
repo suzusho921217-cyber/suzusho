@@ -8,11 +8,16 @@
 from __future__ import annotations
 
 import hashlib
+import json
 import random
 from collections.abc import Mapping
+from pathlib import Path
 from typing import Any
 
 from src.common.config import load
+
+_STATE_DIR = Path(__file__).resolve().parents[2] / ".state"
+_TRENDING_PER_VIDEO = 2
 
 
 def _seed(*parts: str) -> int:
@@ -74,6 +79,11 @@ def select_hashtags(
         rng.shuffle(pool)
         tags += pool[:n]
 
+    # 流行りタグ: 競合の異常値動画に実際に付いていたタグ（MTGが毎日更新）。設定を直接
+    # 渡したとき（テスト等）は使わない。上位から日付シードで数本ずつ回す。
+    if config is None and platform in ("youtube", "instagram"):
+        tags += _trending_tags(brand, platform, date)
+
     seen: set[str] = set()
     out: list[str] = []
     for t in tags:
@@ -82,3 +92,16 @@ def select_hashtags(
             seen.add(key)
             out.append(t)
     return out
+
+
+def _trending_tags(brand: str, platform: str, date: str) -> list[str]:
+    try:
+        data = json.loads((_STATE_DIR / "trending_tags.json").read_text(encoding="utf-8"))
+        cands = [x["tag"] for x in (data.get(brand) or [])[:8]]
+    except Exception:  # noqa: BLE001 - 無ければ従来どおり固定タグだけ
+        return []
+    if not cands:
+        return []
+    rng = random.Random(_seed(brand, platform, date, "trending"))
+    rng.shuffle(cands)
+    return cands[:_TRENDING_PER_VIDEO]

@@ -57,3 +57,18 @@ def test_unknown_or_missing_character_id_adds_no_breed_tag():
 def test_unknown_brand_or_platform_returns_empty():
     assert select_hashtags("bird", "youtube", date="2026-09-02", config=CFG) == []
     assert select_hashtags("cat", "threads", date="2026-09-02", config=CFG) == []
+
+
+def test_trending_tags_used_only_without_injected_config(tmp_path, monkeypatch):
+    import json
+
+    from src.publishers import hashtags
+
+    (tmp_path / "trending_tags.json").write_text(
+        json.dumps({"cat": [{"tag": "#kittenvideo", "n": 5}, {"tag": "#catfail", "n": 3}]}), encoding="utf-8"
+    )
+    monkeypatch.setattr(hashtags, "_STATE_DIR", tmp_path)
+    assert set(hashtags._trending_tags("cat", "youtube", "2026-09-19")) == {"#kittenvideo", "#catfail"}
+    assert hashtags._trending_tags("dog", "youtube", "2026-09-19") == []
+    # 設定を直接渡す従来の呼び方には混ざらない
+    assert "#kittenvideo" not in select_hashtags("cat", "youtube", date="2026-09-19", config=CFG)

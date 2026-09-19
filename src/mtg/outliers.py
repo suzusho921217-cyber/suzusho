@@ -57,7 +57,33 @@ def _seconds(iso: str) -> int:
     return int(m.group(1) or 0) * 60 + int(m.group(2) or 0) if m else 10**6
 
 
-def collect_outliers(key: str, *, now: datetime | None = None) -> list[dict]:
+_HASHTAG = re.compile(r"#[\w぀-ヿ一-鿿ー]+")
+_SPAM_TAGS = {"#fyp", "#foryou", "#foryoupage", "#viral", "#trending", "#subscribe", "#ytshorts",
+              "#viralshorts", "#shorts", "#short", "#youtube", "#youtubeshorts", "#explore"}
+
+
+def trending_hashtags(videos: list[dict], *, top: int = 12) -> dict[str, list[dict]]:
+    """再生10万以上のショートに付いていたハッシュタグを、猫/犬別に出現数で集計する。"""
+    counts: dict[str, dict[str, int]] = {"cat": {}, "dog": {}}
+    for v in videos:
+        sn = v["snippet"]
+        if int(v.get("statistics", {}).get("viewCount", 0)) < _MIN_VIEWS:
+            continue
+        if _seconds(v["contentDetails"]["duration"]) > _MAX_SECONDS:
+            continue
+        text = f"{sn.get('title', '')} {sn.get('description', '')}".lower()
+        brands = [b for b, words in (("cat", ("猫", "ねこ", "cat", "kitten")),
+                                     ("dog", ("犬", "いぬ", "dog", "puppy"))) if any(w in text for w in words)]
+        for tag in {t.lower() for t in _HASHTAG.findall(text)}:
+            if tag in _SPAM_TAGS or len(tag) < 3:
+                continue
+            for b in brands:
+                counts[b][tag] = counts[b].get(tag, 0) + 1
+    return {b: [{"tag": t, "n": n} for t, n in sorted(c.items(), key=lambda x: -x[1])[:top]]
+            for b, c in counts.items()}
+
+
+def collect_outliers(key: str, *, now: datetime | None = None, tag_sink: dict | None = None) -> list[dict]:
     """異常値の高い順に最大_TOP_N件。"""
     now = now or datetime.now(timezone.utc)
     after = (now - timedelta(days=_LOOKBACK_DAYS)).strftime("%Y-%m-%dT%H:%M:%SZ")
@@ -82,6 +108,9 @@ def collect_outliers(key: str, *, now: datetime | None = None) -> list[dict]:
         for c in data.get("items", []):
             st = c.get("statistics", {})
             subs[c["id"]] = 0 if st.get("hiddenSubscriberCount") else int(st.get("subscriberCount", 0))
+
+    if tag_sink is not None:
+        tag_sink.update(trending_hashtags(videos))
 
     out = []
     for v in videos:
@@ -119,12 +148,16 @@ def format_report(items: list[dict]) -> str:
 
 def _save(items: list[dict]) -> None:
     """投稿時のタイトル/本文づくり（publishers.copywriter）が参照できるよう保存する。"""
+    _save_json("outliers.json", items)
+
+
+def _save_json(name: str, data) -> None:
     import json
     from pathlib import Path
 
-    p = Path(__file__).resolve().parents[2] / ".state" / "outliers.json"
+    p = Path(__file__).resolve().parents[2] / ".state" / name
     p.parent.mkdir(parents=True, exist_ok=True)
-    p.write_text(json.dumps(items, ensure_ascii=False, indent=1), encoding="utf-8")
+    p.write_text(json.dumps(data, ensure_ascii=False, indent=1), encoding="utf-8")
 
 
 def gather_outlier_report() -> str:
@@ -136,8 +169,10 @@ def gather_outlier_report() -> str:
             key = f"Bearer {token}" if token else None
         if not key:
             return format_report([])
-        items = collect_outliers(key)
+        tags: dict = {}
+        items = collect_outliers(key, tag_sink=tags)
         _save(items)
+        _save_json("trending_tags.json", tags)
         return format_report(items)
     except Exception as e:  # noqa: BLE001 - 外部API障害でMTG全体を止めない
         return f"（異常値動画の取得に失敗: {type(e).__name__}: {e}）"
