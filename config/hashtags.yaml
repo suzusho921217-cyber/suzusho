@@ -12,11 +12,10 @@ cat:
   youtube:
     always: ["#Shorts", "#猫", "#cat", "#cats"]
     pool:
-    - '#猫の日常'
-    - '#違和感ペット'
-    - '#擬人化猫'
-    - '#AIペット'
-    - '#ショート動画'
+    - '#人間化猫'
+    - '#仮定法'
+    - '#ねこ'
+    - '#AI生成'
     per_video: 4
   tiktok:
     always: ["#猫", "#cat", "#catsoftiktok", "#fyp"]
@@ -25,11 +24,10 @@ cat:
   instagram:
     always: ["#猫", "#cat", "#catstagram", "#catsofinstagram"]
     pool:
-    - '#AIペット'
-    - '#猫の日常'
-    - '#ペット動画'
-    - '#AI生成'
-    - '#面白い動物'
+    - '#猫の気持ち'
+    - '#ねこが人間だったら'
+    - '#猫目線'
+    - '#擬人化'
     per_video: 6
   x:
     always: ["#猫", "#cat"]
