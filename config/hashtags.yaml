@@ -25,12 +25,11 @@ cat:
   instagram:
     always: ["#猫", "#cat", "#catstagram", "#catsofinstagram"]
     pool:
-    - '#猫'
-    - '#ペルシャ'
-    - '#擬人化'
-    - '#ショート動画'
-    - '#かわいい猫'
+    - '#AIペット'
     - '#猫の日常'
+    - '#ペット動画'
+    - '#AI生成'
+    - '#面白い動物'
     per_video: 6
   x:
     always: ["#猫", "#cat"]
