@@ -129,10 +129,15 @@ def test_different_date_shifts_explore_selection():
 def test_levels_within_configured_range():
     alloc = next_day_allocation([], ALLOC_CFG, [Brand.CAT, Brand.DOG])
     plans = build_daily_plan("2026-08-31", alloc, [], PLANNING, PLATFORMS)
+    # 範囲は agent-mtg（set_level_range）が書き換えるので、値を直書きせず config から読む。
+    dur_lo, dur_hi = PLANNING["defaults"]["duration_target_sec"]
     for p in plans:
-        assert 4 <= p.reality_level <= 5
-        assert 1 <= p.oddity_level <= 2
-        assert 6 <= p.duration_target_sec <= 15
+        spec = PLANNING["brands"][p.brand.value]
+        re_lo, re_hi = spec["reality_level"]
+        od_lo, od_hi = spec["oddity_level"]
+        assert re_lo <= p.reality_level <= re_hi
+        assert od_lo <= p.oddity_level <= od_hi
+        assert dur_lo <= p.duration_target_sec <= dur_hi
 
 
 def test_brands_are_interleaved_round_robin():
