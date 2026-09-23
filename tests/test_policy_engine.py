@@ -134,3 +134,22 @@ def test_is_policy_stale_matching_version_false(tmp_path, monkeypatch):
         json.dumps({"youtube": {"version": policy_version(Platform.YOUTUBE), "stale": False}}), encoding="utf-8"
     )
     assert is_policy_stale(Platform.YOUTUBE) is False
+
+
+@pytest.mark.parametrize("notes", ["人間の赤ちゃんと子犬が並ぶ", "幼児が子猫を抱く", "baby and puppy"])
+def test_human_child_depiction_holds(notes):
+    res = check_prompt(_plan(notes=notes), Platform.YOUTUBE)
+    assert res.decision is PolicyDecision.HOLD
+    assert any("児童" in r for r in res.reasons)
+
+
+def test_animal_baby_body_shape_is_not_child_depiction():
+    # characters.yaml の「赤ちゃん体型」は動物の描写なので止めない
+    res = check_prompt(_plan(notes="赤ちゃん体型の子猫"), Platform.YOUTUBE)
+    assert res.decision is PolicyDecision.PASS
+
+
+def test_animal_harm_appearance_holds():
+    res = check_prompt(_plan(notes="ぬいぐるみで押しつぶす"), Platform.YOUTUBE)
+    assert res.decision is PolicyDecision.HOLD
+    assert any("虐待" in r for r in res.reasons)

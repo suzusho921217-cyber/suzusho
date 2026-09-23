@@ -68,3 +68,18 @@ def test_prompt_handles_missing_character_fields():
     text = render_prompt(_plan(), {}, None)
     assert "cat_character" in text
     assert "【禁止】" in text  # 空フィールドでも壊れず組み上がる
+
+
+def test_setting_reversal_uses_plush_not_human_baby():
+    text = render_prompt(_plan(brand=Brand.DOG, concept_tag="設定反転",
+                               hook_type="力関係逆転ドアップ"), CHARACTER)
+    body = text.split("【禁止】")[0]
+    assert "ぬいぐるみ" in body
+    assert "赤ちゃん" not in body
+    assert "内容（設定反転）: 設定反転" not in text     # 台本が展開されている
+    assert "人間の乳幼児・子ども" in text.split("【禁止】")[1]
+
+
+def test_telop_hook_does_not_request_on_screen_text():
+    text = render_prompt(_plan(hook_type="テロップ入り（無音理解対応）"), CHARACTER)
+    assert "文字は入れない" in text

@@ -35,6 +35,21 @@ checks:
     decision: REGENERATE
     message: "暴力・流血表現の疑い"
 
+  # 「体型」は characters.yaml の「赤ちゃん体型」（動物の描写）なので除外。
+  - id: human_child_depiction
+    applies_to: [prompt]
+    when:
+      text_matches: "(赤ちゃん(?!体型)|赤ん坊|乳児|幼児|子ども|子供|児童|baby|infant|toddler|child)"
+    decision: HOLD
+    message: "人間の乳幼児・子どもの登場（児童表現）。人間確認が必要"
+
+  - id: animal_harm_appearance
+    applies_to: [prompt]
+    when:
+      text_matches: "(叩く|殴る|蹴る|踏みつけ|投げ飛ば|押しつぶ|閉じ込め|縛る|溺れ|虐待|abuse)"
+    decision: HOLD
+    message: "動物虐待に見える演出の疑い。人間確認が必要"
+
   - id: high_risk_needs_review
     applies_to: [prompt]
     when:
