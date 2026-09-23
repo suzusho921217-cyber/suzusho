@@ -223,6 +223,8 @@ def cmd_policy_sync(args: argparse.Namespace) -> int:
 
     終了コード: 0=変更なし / 1=フィード取得失敗あり / 2=新着あり（要手動確認）。
     非0は GitHub Actions のジョブ失敗になり、失敗通知メールが飛ぶ。
+    無効な媒体（platforms.yaml で enabled=false）の新着は stale に記録するだけで 0 扱い
+    （有効化した時点で stale が残っているので、確認するまで投稿は止まる）。
     """
     cfg = load("policy_sync")
     feeds = cfg.get("feeds") or []
@@ -263,8 +265,14 @@ def cmd_policy_sync(args: argparse.Namespace) -> int:
         print("[policy-sync] 初回: ベースライン化のみ（次回から差分検知）")
         return 1 if report.has_errors else 0
     if report.has_changes:
-        print(f"[policy-sync] 変更の可能性: {sorted(report.changed_platforms)} を stale にした。手動確認が必要")
-        return 2
+        enabled = {p.value for p in _enabled("platforms", "platforms", Platform)}
+        active = sorted(report.changed_platforms & enabled)
+        inactive = sorted(report.changed_platforms - enabled)
+        if inactive:
+            print(f"[policy-sync] 無効媒体の新着: {inactive} を stale に記録（通知なし。有効化前に確認）")
+        if active:
+            print(f"[policy-sync] 変更の可能性: {active} を stale にした。手動確認が必要")
+            return 2
     if report.has_errors:
         print("[policy-sync] 一部フィード取得失敗")
         return 1

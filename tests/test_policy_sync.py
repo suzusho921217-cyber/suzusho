@@ -140,3 +140,39 @@ def test_cli_policy_sync_first_run_then_change(tmp_path, monkeypatch, capsys):
     stale = json.loads((tmp_path / "policy_sync.json").read_text(encoding="utf-8"))
     assert stale["youtube"]["stale"] is True
     assert "新着" in capsys.readouterr().out
+
+
+def test_cli_policy_sync_disabled_platform_change_exits_zero(tmp_path, monkeypatch, capsys):
+    """無効媒体（x）の新着は stale に記録するが失敗通知（非0）にはしない。"""
+    monkeypatch.setattr(cli, "STATE_DIR", tmp_path)
+    orig_load = cli.load
+
+    def fake_load(name):
+        if name == "policy_sync":
+            return {"feeds": FEEDS}
+        if name == "platforms":
+            return {"platforms": {"youtube": {"enabled": True}, "x": {"enabled": False}}}
+        return orig_load(name)
+
+    monkeypatch.setattr(cli, "load", fake_load)
+
+    state = {"a": ATOM, "x": RSS}
+    monkeypatch.setattr(cli, "_http_get", lambda url: state["a"] if "yt" in url else state["x"])
+
+    assert cli.main(["policy-sync"]) == 0  # 初回ベースライン
+
+    state["x"] = RSS.replace("  <item>", """  <item>
+    <title>Sep 21, 2026</title>
+    <link>https://docs.x.com/changelog#sep-21-2026</link>
+    <guid isPermaLink="false">b1ef6306bef0b597</guid>
+    <pubDate>Mon, 21 Sep 2026 21:00:00 GMT</pubDate>
+  </item>
+  <item>""", 1)
+    assert cli.main(["policy-sync"]) == 0  # 無効媒体のみ → 通知なし
+
+    stale = json.loads((tmp_path / "policy_sync.json").read_text(encoding="utf-8"))
+    assert stale["x"]["stale"] is True
+    assert "無効媒体" in capsys.readouterr().out
+
+    state["a"] = ATOM_WITH_NEW
+    assert cli.main(["policy-sync"]) == 2  # 有効媒体の新着は従来どおり非0
