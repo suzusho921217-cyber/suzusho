@@ -744,6 +744,12 @@ def cmd_publish(args: argparse.Namespace) -> int:
         print(f"  ! {oc['plan_id']} [{oc['platform']}] {oc['action']}: "
               f"{'; '.join(oc['reasons'])}")
     print(f"[publish] wrote {STATE_DIR / f'publish-{date}.json'}")
+    # FAILED が1件でもあれば非0（Actions のジョブ失敗 = 通知メール）。以前は 0 で終わり、
+    # 2026-09-20〜21 の YouTube トークン失効（invalid_grant）に誰も気づかなかった。
+    # HOLD / SKIP / DEFERRED は意図した停止なので失敗扱いにしない。
+    if by_action.get("FAILED"):
+        print(f"[publish] 投稿失敗 {by_action['FAILED']} 件。上のエラーを確認")
+        return 4
     return 0
 
 

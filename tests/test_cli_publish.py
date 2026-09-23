@@ -112,7 +112,7 @@ def test_publish_survives_unexpected_error_in_one_platform(generated, monkeypatc
     monkeypatch.setattr(cli_module, "decide_and_publish", _boom)
 
     rc = main(["publish", "--date", "2026-09-02"])
-    assert rc == 0  # 実行全体はクラッシュしない
+    assert rc == 4  # 実行全体はクラッシュせず、FAILED ありは非0で通知
 
     pub = json.loads((generated / "publish-2026-09-02.json").read_text(encoding="utf-8"))
     assert pub["outcomes"]  # 何かしら保存されている（0件で失われていない）
