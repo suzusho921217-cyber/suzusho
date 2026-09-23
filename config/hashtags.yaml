@@ -24,10 +24,11 @@ cat:
   instagram:
     always: ["#猫", "#cat", "#catstagram", "#catsofinstagram"]
     pool:
-    - '#猫の気持ち'
-    - '#ねこが人間だったら'
-    - '#猫目線'
-    - '#擬人化'
+    - '#猫の予想外のリアクション'
+    - '#擬人化猫'
+    - '#二段オチ'
+    - '#スロー猫'
+    - '#AIペット'
     per_video: 6
   x:
     always: ["#猫", "#cat"]
@@ -50,7 +51,12 @@ dog:
     per_video: 5
   instagram:
     always: ["#犬", "#dog", "#dogstagram", "#dogsofinstagram"]
-    pool: ["#いぬすたぐらむ", "#子犬", "#puppy", "#puppiesofinstagram", "#わんすたぐらむ", "#cutedog", "#doglover", "#犬のいる暮らし", "#instadog", "#ペット", "#癒し", "#わんこ部", "#ふわもこ部"]
+    pool:
+    - '#赤ちゃんと犬'
+    - '#力関係逆転'
+    - '#そっくりさん'
+    - '#犬のサイドアイ'
+    - '#AIペット'
     per_video: 6
   x:
     always: ["#犬", "#dog"]
