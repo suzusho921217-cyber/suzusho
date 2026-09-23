@@ -9,6 +9,12 @@ on:
     - cron: "0 9 * * *"   # 18:00 JST — 1本
     - cron: "0 12 * * *"  # 21:00 JST — 残り全部
   workflow_dispatch:
+    inputs:
+      date:
+        description: "過去日の取りこぼしを投稿する日付（YYYY-MM-DD）。空なら最新日"
+        required: false
+        type: string
+        default: ""
 
 concurrency:
   group: sns-pipeline-state
@@ -30,4 +36,5 @@ jobs:
     uses: ./.github/workflows/_reusable.yml
     with:
       command: publish
+      extra_args: ${{ inputs.date && format('--date {0}', inputs.date) || '' }}
     secrets: inherit
