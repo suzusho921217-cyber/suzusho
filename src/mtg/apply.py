@@ -16,6 +16,7 @@ auto_apply に入れないよう指示済みだが、ここでも構造的に不
                       explore_ratio（勝ちパターン活用 vs 新規探索の比率。合計1・
                       exploit は 0.3〜0.9 に制限）
   - set_daily_slots: config/scoring.yaml の allocation.total_daily_slots（1日の生成本数）。
+                      減らす・据え置きのみ。増やすのはユーザー承認制（needs_user_approval）。
                       月¥5,000 を絶対に超えないよう、`monthly_budget ÷ (1本の単価 × 20日)`
                       を上限にクランプ（＝最低20日分は月内で回るペースしか許さない）。
                       尺・広告・monthly_budget 自体は変えられない。実際の停止は
@@ -171,6 +172,11 @@ def apply_set_daily_slots(count) -> str:
         )
     path = CONFIG_DIR / "scoring.yaml"
     data = _load(path)
+    current = int(data["allocation"].get("total_daily_slots", count))
+    if count > current:
+        raise ApplyError(
+            f"本数を増やす（{current}→{count}）のはユーザー承認制。needs_user_approval で提案する"
+        )
     data["allocation"]["total_daily_slots"] = count
     _dump(path, data)
     per_video = _price_per_video_jpy()

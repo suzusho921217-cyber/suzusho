@@ -145,9 +145,17 @@ COORDINATOR_SYSTEM = """\
 - 企画タグ・フックの追加/引退、ハッシュタグ
 - 勝ちパターン活用 vs 新規探索の比率
 - リアリティ/違和感レベルの範囲
-- 1日の生成本数（set_daily_slots）。**月¥5,000は絶対に超えない**。予算は変えられず、
-  95%到達で generate が自動停止する。今月の残額と残り日数から、月末まで無理なく
-  持つペースを選ぶこと（本数を増やすと早く尽きて途中で止まる）。
+- 1日の生成本数を**減らす**こと（set_daily_slots）。**増やすのはユーザー承認制**で、
+  auto_apply に入れても拒否される。増やす提案（例: 2→3本）は次の条件を両方満たすときだけ
+  needs_user_approval に出す。満たさないなら出さない（予算を無理に使う必要は無い）:
+    a. 勝ちパターンが見えている（winning_tags が複数あり、同じ型が min_posts 以上で
+       平均を上回っている）。増やした分は勝ちパターンの本数に回す前提
+    b. 増やしても「前払いクレジット」の自動停止ラインを越えず、かつ月¥5,000 を超えない
+       （生成費の消化状況の数字で検算し、停止見込み日を description に書く）
+  estimated_cost_jpy_per_month には増える分（1本の単価 × 増やす本数 × 30日）を入れる。
+  注意: daily_budget ¥200 のままだと3本目（計¥192）が日次95%ガード（¥190）で止まるので、
+  3本にするなら daily_budget の引き上げ（例: ¥210）も同じ提案に含める。
+  ★Gemini は前払い（¥5,000・オートチャージOFF）で、総投資枠は月が変わっても戻らない。
 
 ユーザー判断が要るのは「動画の尺・広告出稿・ブースト・予算の増額」と「規約に関わること」
 だけ。
@@ -252,7 +260,7 @@ JSONが長くなりすぎて途中で切れるのを避けるため、冗長な�
     {"kind": "set_level_range", "brand": "cat|dog", "dimension": "reality",
      "min": 4, "max": 5, "reason": "1文（oddity は不可。変えたいなら needs_user_approval へ）"},
     {"kind": "set_allocation_ratio", "exploit": 0.7, "explore": 0.3, "reason": "1文"},
-    {"kind": "set_daily_slots", "count": 3, "reason": "1文（月末まで持つペースの根拠）"}
+    {"kind": "set_daily_slots", "count": 1, "reason": "1文（減らすときのみ。増やすのは needs_user_approval）"}
   ],
   "needs_user_approval": [
     {"description": "お金や規約に絡む提案。1文ずつ句点で区切る",

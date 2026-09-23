@@ -140,6 +140,13 @@ def test_set_daily_slots_within_budget_cap(config_dir):
         apply_set_daily_slots(0)
 
 
+def test_set_daily_slots_increase_needs_user_approval(config_dir):
+    assert apply_set_daily_slots(1).startswith("[applied]")      # 減らすのは自動反映可
+    with pytest.raises(ApplyError, match="承認制"):
+        apply_set_daily_slots(2)                                  # 増やすのは不可
+    assert _load(config_dir / "scoring.yaml")["allocation"]["total_daily_slots"] == 1
+
+
 def test_apply_all_still_rejects_money_kinds(config_dir):
     results = apply_all([
         {"kind": "set_video_duration", "seconds": 30},    # 尺=お金 → 許可外

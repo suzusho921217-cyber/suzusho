@@ -227,7 +227,13 @@ def _spend_summary(budget: dict) -> str:
     month = float(spend.get("month", 0.0))
     monthly_budget = float(budget.get("monthly_budget", 5000) or 5000)
     stop_at = monthly_budget * float(budget.get("automatic_stop_ratio", 0.95))
-    remaining = max(0.0, stop_at - month)
+    # 前払いクレジット（total_investment_cap）は月が変わっても戻らない。月次と両方の
+    # 停止ラインのうち、先に来る方までしか使えない。
+    total = float(spend.get("total", month))
+    total_cap = float(budget.get("total_investment_cap", monthly_budget) or monthly_budget)
+    total_stop_at = total_cap * float(budget.get("automatic_stop_ratio", 0.95))
+    total_remaining = max(0.0, total_stop_at - total)
+    remaining = min(max(0.0, stop_at - month), total_remaining)
 
     gen = load("generation").get("veo", {}) or {}
     per_sec = float(gen.get("price_jpy_per_sec", 8) or 8)
@@ -240,6 +246,8 @@ def _spend_summary(budget: dict) -> str:
     days_covered = int(remaining // daily_cost) if daily_cost else 999
     return json.dumps({
         "今月の生成費": round(month),
+        "前払いクレジットの累計消化": round(total),
+        "前払いクレジットの停止までの残り(月をまたいでも戻らない)": round(total_remaining),
         "自動停止ライン(95%)": round(stop_at),
         "残り(停止までに使える額)": round(remaining),
         "今月の残り日数": days_left,
