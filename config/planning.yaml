@@ -41,7 +41,7 @@ brands:
     - 人間視点ドアップ+スロー
     - スロー冒頭フリーズ＋スローエンド
     reality_level: [4, 5]           # 実写級
-    oddity_level: [1, 2]            # 基本は自然。「そっくりさん」等だけ 2
+    oddity_level: [2, 3]            # 9/19〜の違和感3が好調（n=3〜4）なので検証中。悪化したら [1, 2] に戻す
   dog:
     characters: [dog_golden_retriever, dog_corgi, dog_pomeranian, dog_french_bulldog, dog_toy_poodle, dog_shiba, dog_beagle, dog_chihuahua]
     policy_risk: LOW
