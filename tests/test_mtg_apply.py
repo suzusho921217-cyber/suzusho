@@ -106,8 +106,12 @@ def test_retire_hook_type_missing_is_skip(config_dir):
 
 
 def test_set_level_range_validates(config_dir):
-    assert apply_set_level_range("cat", "oddity", 2, 4).startswith("[applied]")
-    assert _load(config_dir / "planning.yaml")["brands"]["cat"]["oddity_level"] == [2, 4]
+    assert apply_set_level_range("cat", "reality", 3, 5).startswith("[applied]")
+    assert _load(config_dir / "planning.yaml")["brands"]["cat"]["reality_level"] == [3, 5]
+    before = _load(config_dir / "planning.yaml")["brands"]["cat"]["oddity_level"]
+    with pytest.raises(ApplyError):
+        apply_set_level_range("cat", "oddity", 3, 4)       # ブランド全体に効くので自動反映不可
+    assert _load(config_dir / "planning.yaml")["brands"]["cat"]["oddity_level"] == before
     with pytest.raises(ApplyError):
         apply_set_level_range("cat", "reality", 3, 9)      # 5超え
     with pytest.raises(ApplyError):

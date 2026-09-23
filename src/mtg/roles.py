@@ -249,8 +249,8 @@ JSONが長くなりすぎて途中で切れるのを避けるため、冗長な�
      "brand": "cat|dog", "tag": "（tag系）", "hook": "（hook系）", "reason": "1文"},
     {"kind": "set_hashtags", "brand": "cat|dog", "platform": "youtube|instagram",
      "tags": ["#a", "#b"], "reason": "1文"},
-    {"kind": "set_level_range", "brand": "cat|dog", "dimension": "reality|oddity",
-     "min": 4, "max": 5, "reason": "1文"},
+    {"kind": "set_level_range", "brand": "cat|dog", "dimension": "reality",
+     "min": 4, "max": 5, "reason": "1文（oddity は不可。変えたいなら needs_user_approval へ）"},
     {"kind": "set_allocation_ratio", "exploit": 0.7, "explore": 0.3, "reason": "1文"},
     {"kind": "set_daily_slots", "count": 3, "reason": "1文（月末まで持つペースの根拠）"}
   ],

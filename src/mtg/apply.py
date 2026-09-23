@@ -8,8 +8,10 @@ auto_apply に入れないよう指示済みだが、ここでも構造的に不
                       （最低数は残す。cat/dog の核を空にしない）
   - set_hashtags:    config/hashtags.yaml の <brand>.<platform>.pool を置き換え
                       （always・per_video は触らない）
-  - set_level_range: config/planning.yaml の <brand>.reality_level / oddity_level の
-                      [min,max] を差し替え（1〜5 の範囲、min<=max）
+  - set_level_range: config/planning.yaml の <brand>.reality_level の
+                      [min,max] を差し替え（1〜5 の範囲、min<=max）。
+                      oddity_level は不可: ブランド全体に効くため、特定企画だけ上げる
+                      つもりの提案で全企画の違和感が上がった（2026-09-19）。人間の承認事項。
   - set_allocation_ratio: config/scoring.yaml の allocation.exploit_ratio /
                       explore_ratio（勝ちパターン活用 vs 新規探索の比率。合計1・
                       exploit は 0.3〜0.9 に制限）
@@ -119,9 +121,13 @@ def apply_retire_hook_type(brand: str, hook: str) -> str:
 
 def apply_set_level_range(brand: str, dimension: str, lo, hi) -> str:
     brand = _require_brand(brand)
-    key = {"reality": "reality_level", "oddity": "oddity_level"}.get(dimension)
+    if dimension == "oddity":
+        raise ApplyError(
+            "oddity は自動反映しない（ブランド全体に効くため）。needs_user_approval で提案する"
+        )
+    key = {"reality": "reality_level"}.get(dimension)
     if key is None:
-        raise ApplyError(f"未知のdimension: {dimension!r}（reality / oddity のみ）")
+        raise ApplyError(f"未知のdimension: {dimension!r}（reality のみ）")
     try:
         lo, hi = int(lo), int(hi)
     except (TypeError, ValueError) as e:
