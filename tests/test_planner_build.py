@@ -156,3 +156,21 @@ def test_unknown_brand_pool_raises():
     bad = {"defaults": {}, "brands": {}}
     with pytest.raises(KeyError):
         build_daily_plan("2026-08-31", alloc, [], bad, PLATFORMS)
+
+
+def test_explore_character_and_levels_rotate_by_date():
+    # 2026-09-11〜23 は nonce が毎日 0 で、猫は毎日ペルシャ・違和感は範囲の最小値に固定されていた
+    alloc = _alloc(cat=(0, 1), dog=(0, 1))
+    days = [build_daily_plan(f"2026-09-{d}", alloc, [], PLANNING, PLATFORMS) for d in range(24, 31)]
+    cat_chars = {p.character_id for plans in days for p in plans if p.brand is Brand.CAT}
+    assert len(cat_chars) == 7                     # 1週間で全品種を一巡
+    oddities = {p.oddity_level for plans in days for p in plans if p.brand is Brand.CAT}
+    assert len(oddities) > 1
+
+
+def test_exploit_drops_character_removed_from_pool():
+    alloc = _alloc(cat=(1, 0))
+    wt = [{"brand": "cat", "concept_tag": "二段オチ", "hook_type": "いきなりドアップ",
+           "character_id": "cat_removed_breed", "score": 1.0}]
+    plans = build_daily_plan("2026-09-24", alloc, wt, PLANNING, PLATFORMS)
+    assert plans[0].character_id in PLANNING["brands"]["cat"]["characters"]

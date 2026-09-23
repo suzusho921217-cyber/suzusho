@@ -12,6 +12,7 @@ plan_daily.yml が1日1回呼ぶ。前日までの成績（learning の出力）
 from __future__ import annotations
 
 import math
+import zlib
 from dataclasses import dataclass, replace
 from itertools import zip_longest
 
@@ -234,10 +235,12 @@ class _PlanCtx:
     platforms: list[Platform]
 
     def _level(self, key: str, nonce: int) -> int:
-        return _pick_in_range(self.pool[key], nonce)
+        # 軸ごとに別の値で選ぶ（同じ nonce だと reality と oddity が常に連動し、
+        # 学習でどちらが効いたか区別できなくなる）。
+        return _pick_in_range(self.pool[key], zlib.crc32(f"{nonce}:{key}".encode()))
 
     def pick_character(self, nonce: int) -> str:
-        """explore 枠の品種を決定的に巡回選択する。"""
+        """explore 枠の品種を決定的に巡回選択する（日付 seed 込みの nonce で日ごとに回る）。"""
         return self.characters[nonce % len(self.characters)]
 
 
@@ -255,7 +258,7 @@ def _explore_plan(
         character_id=ctx.pick_character(nonce),
         reality_level=ctx._level("reality_level", nonce),
         oddity_level=ctx._level("oddity_level", nonce),
-        duration_target_sec=_pick_in_range(ctx.duration_range, nonce),
+        duration_target_sec=_pick_in_range(ctx.duration_range, 0),
         experiment_flag=flag,
         policy_risk=ctx.risk,
         prompt_version=ctx.prompt_version,
@@ -273,11 +276,15 @@ def _exploit_plan(
         brand=ctx.brand,
         concept_tag=str(wt.get("concept_tag", fallback_combo[0])),
         hook_type=str(wt.get("hook_type", fallback_combo[1])),
-        character_id=str(wt.get("character_id", ctx.pick_character(nonce))),
+        # プールから外した品種（例: ペルシャ）の勝ちタグは、品種だけ今のプールから選び直す
+        character_id=(
+            str(wt["character_id"]) if wt.get("character_id") in ctx.characters
+            else ctx.pick_character(nonce)
+        ),
         reality_level=int(wt.get("reality_level", ctx._level("reality_level", nonce))),
         oddity_level=int(wt.get("oddity_level", ctx._level("oddity_level", nonce))),
         duration_target_sec=int(
-            wt.get("duration_target_sec", _pick_in_range(ctx.duration_range, nonce))
+            wt.get("duration_target_sec", _pick_in_range(ctx.duration_range, 0))
         ),
         experiment_flag=ExperimentFlag.EXPLOIT,
         policy_risk=ctx.risk,
@@ -348,10 +355,10 @@ def build_daily_plan(
         # --- exploit 枠: winning_tags を score 降順で採用。不足分は新規企画で補填 ---
         for k in range(ba.exploit):
             if k < len(brand_winning):
-                brand_plans.append(_exploit_plan(ctx, 0, brand_winning[k], combos[0], k))
+                brand_plans.append(_exploit_plan(ctx, 0, brand_winning[k], combos[0], seed + k))
             else:
                 brand_plans.append(_explore_plan(
-                    ctx, 0, combos[cursor % len(combos)], cursor,
+                    ctx, 0, combos[cursor % len(combos)], seed + cursor,
                     flag=ExperimentFlag.EXPLOIT,
                     notes="exploit: 勝ちタグ不足のため新規企画で補填",
                 ))
@@ -360,7 +367,7 @@ def build_daily_plan(
         # --- explore 枠: 未使用の (concept_tag, hook_type) を巡回選択 ---
         for _ in range(ba.explore):
             brand_plans.append(_explore_plan(
-                ctx, 0, combos[cursor % len(combos)], cursor,
+                ctx, 0, combos[cursor % len(combos)], seed + cursor,
                 flag=ExperimentFlag.EXPLORE,
                 notes="explore: 未使用の企画タグ×フック組み合わせ",
             ))
