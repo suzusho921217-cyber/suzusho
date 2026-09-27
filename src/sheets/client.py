@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import abc
 import json
+import re
 import ssl
 import time
 from datetime import datetime, timedelta, timezone
@@ -321,6 +322,21 @@ class LocalStore(Store):
         return [decision_from_row(r) for r in self._read("decisions.json", {}).values()]
 
 
+def _row_from_a1(a1: str | None) -> int | None:
+    """"'タブ'!A12:T12" のような範囲文字列から先頭の行番号(12)を取り出す。"""
+    if not a1:
+        return None
+    m = re.search(r"![A-Z]+(\d+)", a1)
+    return int(m.group(1)) if m else None
+
+
+def _cell_display(v) -> str:
+    """RAW で書いた値を、Sheets から読み戻したときの文字列表現に寄せる。"""
+    if isinstance(v, bool):
+        return "TRUE" if v else "FALSE"
+    return v if isinstance(v, str) else str(v)
+
+
 def _smart_num(v: str) -> int | float | str:
     """Sheets のセル文字列を int/float に。数値でなければそのまま返す。"""
     try:
@@ -451,6 +467,7 @@ def _parse_dt_ja(display_str: str) -> str:
 
 _MAX_ATTEMPTS = 3
 _RETRY_BACKOFF_SEC = 5.0
+_RATE_LIMIT_BACKOFF_SEC = 30.0
 _RETRYABLE_STATUS = {429, 500, 502, 503, 504}
 
 
@@ -475,9 +492,12 @@ def _execute_with_retry(request, *, sleep=time.sleep):
             status = getattr(e.resp, "status", None)
             if status not in _RETRYABLE_STATUS or attempt == _MAX_ATTEMPTS:
                 raise
+            # 429 は「1分あたり」の上限なので、数秒待っても同じ窓の中で再び弾かれる。
+            # 窓が切り替わるまで待つ。
+            wait = (_RATE_LIMIT_BACKOFF_SEC if status == 429 else _RETRY_BACKOFF_SEC) * attempt
             print(f"[sheets] Sheets API 一時エラー（{attempt}/{_MAX_ATTEMPTS}回目, "
-                  f"status={status}）: {e}. {_RETRY_BACKOFF_SEC}秒後にリトライ")
-            sleep(_RETRY_BACKOFF_SEC * attempt)
+                  f"status={status}）: {e}. {wait}秒後にリトライ")
+            sleep(wait)
         except _TRANSIENT_NETWORK_ERRORS as e:
             if attempt == _MAX_ATTEMPTS:
                 raise
@@ -674,7 +694,7 @@ class SheetsStore(Store):
             # range は見出し行から下に絞る（見出しより上に集計欄等があっても、
             # そちらを「表」として誤検出して追記されないようにするため）。
             append_range = f"{tab}!A{header_idx}:Z" if header_idx else tab
-            _execute_with_retry(svc.append(
+            res = _execute_with_retry(svc.append(
                 spreadsheetId=self.spreadsheet_id, range=append_range,
                 valueInputOption="RAW", insertDataOption="OVERWRITE",
                 body={"values": [values]},
@@ -684,9 +704,21 @@ class SheetsStore(Store):
                 spreadsheetId=self.spreadsheet_id, range=f"{tab}!A{match_row_number}",
                 valueInputOption="RAW", body={"values": [values]},
             ))
+            written_row = match_row_number
         # 書いた内容がキャッシュに反映されていないと、次の読み取りが古いまま
-        # （例: 直後の重複チェックが今書いた行を見つけられない）になるので破棄する。
-        self._raw_cache.pop(tab, None)
+        # （例: 直後の重複チェックが今書いた行を見つけられない）になる。
+        # 以前はここでキャッシュを捨てていたが、それだと metrics が投稿1件ごとに
+        # パフォーマンスDB全体を読み直し、投稿数が増えて再び読み取り上限
+        # (60回/分) に達していた(2026-09-25〜26)。書いた行だけキャッシュに反映する。
+        if match_row_number is None:
+            written_row = _row_from_a1((res or {}).get("updates", {}).get("updatedRange"))
+        cached = self._raw_cache.get(tab)
+        if cached is None or written_row is None:
+            self._raw_cache.pop(tab, None)
+            return
+        while len(cached) < written_row:
+            cached.append([])
+        cached[written_row - 1] = [_cell_display(v) for v in values]
 
     # --- 投稿DB --------------------------------------------------------
 

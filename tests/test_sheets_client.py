@@ -197,8 +197,10 @@ class _FakeValues:
 
     def append(self, spreadsheetId, range, valueInputOption, insertDataOption, body):
         tab = range.split("!")[0]
-        self.tabs.setdefault(tab, []).append(list(body["values"][0]))
-        return _FakeRequest({})
+        rows = self.tabs.setdefault(tab, [])
+        rows.append(list(body["values"][0]))
+        n = len(rows)
+        return _FakeRequest({"updates": {"updatedRange": f"'{tab}'!A{n}:Z{n}"}})
 
 
 class _FakeSpreadsheets:
@@ -333,11 +335,10 @@ def test_sheets_store_caches_reads_within_a_run_and_refreshes_after_write(monkey
     assert len(get_calls) == 1
 
     get_calls.clear()
-    store.get_post("p1:youtube")  # 直前の書き込みで無効化されているので1回読む
-    assert len(get_calls) == 1
-
-    get_calls.clear()
-    store.get_post("p1:youtube")  # 何も書いていないのでキャッシュを使い回す(0回)
+    # 書いた行はキャッシュにも反映済みなので読み直さない(0回)。
+    # 書くたびに捨てて読み直すと metrics が投稿数ぶん全体を再取得し、
+    # 再び読み取り上限に達していた(2026-09-25〜26)。
+    assert store.get_post("p1:youtube") == _post()
     assert len(get_calls) == 0
 
     get_calls.clear()
@@ -345,6 +346,40 @@ def test_sheets_store_caches_reads_within_a_run_and_refreshes_after_write(monkey
     store.upsert_post(_post(status=PostStatus.FAILED))
     assert len(get_calls) == 0
     assert store.get_post("p1:youtube").status == PostStatus.FAILED
+    assert len(get_calls) == 0
+    # キャッシュ上の値と、シートから読み直した値が一致する
+    fresh = _fake_store(tabs)
+    assert fresh.get_post("p1:youtube") == store.get_post("p1:youtube")
+
+
+def test_sheets_snapshot_cache_matches_sheet_after_many_writes(monkeypatch):
+    # metrics と同じく1プロセスで多数のスナップショットを書いても、
+    # パフォーマンスDBの読み取りは最初の1回だけで、中身はシートと一致する。
+    tabs = {"パフォーマンスDB": [_SNAPSHOT_HEADER_JA]}
+    store = _fake_store(tabs)
+    get_calls = []
+    orig_get = _FakeValues.get
+
+    def counting_get(self, **kw):
+        get_calls.append(1)
+        return orig_get(self, **kw)
+
+    monkeypatch.setattr(_FakeValues, "get", counting_get)
+
+    def snap(i, views):
+        return PerformanceSnapshot(
+            post_key=f"p{i}:youtube", snapshot="latest",
+            collected_at=datetime(2026, 9, 27, 12, 0, tzinfo=JST),
+            views=views, shares=3, views_delta=5,
+        )
+
+    for i in range(100):
+        store.upsert_snapshot(snap(i, 1000 + i), compute_delta=False)
+    for i in range(100):
+        store.upsert_snapshot(snap(i, 2000 + i), compute_delta=False)
+    assert len(get_calls) == 1
+    assert len(tabs["パフォーマンスDB"]) == 101
+    assert _fake_store(tabs).list_snapshots() == store.list_snapshots()
 
 
 def test_sheets_upsert_post_appends_when_missing():
