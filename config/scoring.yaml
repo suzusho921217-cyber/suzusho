@@ -45,14 +45,9 @@ learning:
     - "2026-09-05-cat-sample01:youtube"
     - "2026-09-05-cat-sample01-ig:instagram"
 
-  # 媒体別の重み上書き（completion_rate に頼れない媒体向け）。
-  # YouTube Shorts は Analytics API が averageViewDuration / engagedViews を
-  # 常に 0・欠損で返す（2026-09-11 実データで全件確認）ため completion_rate が
-  # 常時欠損になる。指定しなければ compute_score が毎回自動で残り指標に
-  # 重みを再分配するが、それを「YouTubeはこの指標を使わない」という明示設定にする。
-  score_weight_overrides:
-    youtube:
-      share_rate: 0.36
-      follow_rate: 0.36
-      comment_rate: 0.14
-      cost_efficiency: 0.14
+  # 媒体別の重み上書き（completion_rate に頼れない媒体向け）。指定が無い媒体は上の既定を使う。
+  # 2026-09-11〜27 は YouTube の completion_rate を外していた（平均視聴秒/尺 が
+  # 0 か 100% 張り付きで使えなかったため）。2026-09-27 に YouTube の completion_rate を
+  # 視聴継続率（engagedViews / views = スワイプされなかった割合）に切り替え、
+  # 過去分も再計算したので上書きを外して既定の重みに戻した。
+  score_weight_overrides: {}

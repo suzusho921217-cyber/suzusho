@@ -315,6 +315,41 @@ def test_fetch_metrics_revenue_failure_does_not_block_other_analytics(monkeypatc
     assert "estimatedRevenue" not in metrics
 
 
+def test_fetch_metrics_completion_is_stay_rate_from_analytics_views(monkeypatch):
+    # Shorts はループするので 平均視聴秒/尺 は常に100%超。完視聴率は
+    # engagedViews / Analytics の views（スワイプされなかった割合）にする。
+    # 再生数そのものは Data API の値のまま（Analytics の views で上書きしない）。
+    videos = _FakeVideosResource(list_result={"items": [{"statistics": {"viewCount": "1277"}}]})
+    analytics = _FakeAnalytics(result={
+        "columnHeaders": [{"name": "views"}, {"name": "engagedViews"},
+                          {"name": "averageViewDuration"}],
+        "rows": [[1000, 250, 12]],
+    })
+    pub = YouTubePublisher()
+    _wire(monkeypatch, pub, youtube=_FakeYouTube(videos=videos), analytics=analytics)
+
+    metrics = pub.fetch_metrics("yt-123")
+    assert metrics["views"] == 1277
+    assert metrics["completion_rate"] == 0.25
+
+
+def test_fetch_metrics_window_uses_pacific_dates_and_stay_rate(monkeypatch):
+    from datetime import datetime, timedelta, timezone
+
+    analytics = _FakeAnalytics(result={
+        "columnHeaders": [{"name": "views"}, {"name": "engagedViews"}],
+        "rows": [[200, 50]],
+    })
+    pub = YouTubePublisher()
+    _wire(monkeypatch, pub, analytics=analytics)
+    jst = timezone(timedelta(hours=9))
+    start = datetime(2026, 9, 13, 1, 20, tzinfo=jst)   # 太平洋時間では 9/12
+    got = pub.fetch_metrics_window("yt-1", start, start + timedelta(days=7))
+    assert got["views"] == 200 and got["completion_rate"] == 0.25
+    call = analytics.reports().calls[0]
+    assert call["startDate"] == "2026-09-12" and call["endDate"] == "2026-09-19"
+
+
 # --- fetch_account_followers ------------------------------------------------
 
 def test_fetch_account_followers_returns_subscriber_count(monkeypatch):

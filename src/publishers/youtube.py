@@ -40,6 +40,19 @@ def _idempotency_tag(post: Post) -> str:
 _AI_DISCLOSURE_NOTE = "※この動画にはAIで生成・加工された合成コンテンツが含まれます。"
 
 
+def _add_stay_rate(analytics: dict, views) -> None:
+    """YouTube の completion_rate を「視聴継続率」= engagedViews / views で入れる。
+
+    Shorts はループ再生されるうえ、averageViewDuration はスワイプせず見続けた人
+    だけの平均なので、平均視聴秒 / 尺 はほぼ全件 100% に張り付いて差がつかない
+    （2026-09-27 実データで確認）。engagedViews / views（＝スワイプされなかった割合、
+    Studio の「視聴 vs スワイプ」）は 8〜35% とばらつき、Shorts の良し悪しを表す。
+    """
+    engaged = analytics.get("engagedViews")
+    if engaged is not None and views:
+        analytics["completion_rate"] = engaged / views
+
+
 class YouTubePublisher(Publisher):
     platform = Platform.YOUTUBE
 
@@ -142,16 +155,23 @@ class YouTubePublisher(Publisher):
         # 401になり engagedViews 等の取れるはずの指標まで巻き添えで失敗していた。
         # 収益は別リクエストに分離し、非収益指標が失敗を道連れにしないようにする。
         try:
-            metrics.update(self._fetch_analytics(
+            analytics = self._fetch_analytics(
                 platform_post_id,
-                "engagedViews,averageViewDuration,shares,subscribersGained,"
+                "views,engagedViews,averageViewDuration,shares,subscribersGained,"
                 "videosAddedToPlaylists",
-            ))
+            )
+            # 再生数は Data API（リアルタイム）の値を使う。Analytics の views は
+            # 視聴継続率の分母にだけ使う（数日遅れで確定するので、分子の engagedViews と
+            # 同じ Analytics 同士で割らないと公開直後は率が不当に低く出る）。
+            _add_stay_rate(analytics, analytics.pop("views", None))
+            metrics.update(analytics)
         except (HttpError, GoogleAuthError) as e:
             print(f"[youtube] Analytics(非収益指標) 取得失敗（基本指標のみで継続）: {e}")
 
         try:
-            metrics.update(self._fetch_analytics(platform_post_id, "estimatedRevenue"))
+            revenue = self._fetch_analytics(platform_post_id, "estimatedRevenue")
+            if "estimatedRevenue" in revenue:
+                metrics["estimatedRevenue"] = revenue["estimatedRevenue"]
         except (HttpError, GoogleAuthError) as e:
             # 未収益化チャンネルでは estimatedRevenue だけ取れない（想定内）。
             print(f"[youtube] 収益取得失敗（未収益化の可能性、他指標には影響なし）: {e}")
@@ -186,7 +206,9 @@ class YouTubePublisher(Publisher):
         if not rows:
             return {}
         headers = [h["name"] for h in resp.get("columnHeaders", [])]
-        return dict(zip(headers, rows[0]))
+        out = dict(zip(headers, rows[0]))
+        _add_stay_rate(out, out.get("views"))
+        return out
 
     def fetch_account_followers(self) -> int | None:
         from google.auth.exceptions import GoogleAuthError
