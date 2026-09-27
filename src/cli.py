@@ -74,7 +74,7 @@ from src.media.processor import (
     make_variant,
     normalize_master,
 )
-from src.metrics.collector import collect_snapshot, due_snapshots
+from src.metrics.collector import collect_snapshot, due_snapshots, needs_backfill, window_end
 from src.planner.planner import build_daily_plan, next_day_allocation, render_prompt
 from src.policy.engine import check_prompt, policy_version
 from src.policy.policy_sync import check_feeds
@@ -834,8 +834,10 @@ def cmd_metrics(args: argparse.Namespace) -> int:
 
     collected = 0
     for post in posts:
-        existing = {s.snapshot for s in store.list_snapshots(post_key=post.post_key)}
-        due = due_snapshots(post, now, existing_labels=existing)
+        post_snaps = store.list_snapshots(post_key=post.post_key)
+        existing = {s.snapshot for s in post_snaps}
+        empty = {s.snapshot for s in post_snaps if s.views is None}
+        due = due_snapshots(post, now, existing_labels=existing, empty_labels=empty)
         if not due:
             continue
         publisher = get_publisher(post.platform, brand=post.brand)
@@ -860,6 +862,19 @@ def cmd_metrics(args: argparse.Namespace) -> int:
         followers_before = _followers_before(post)
         latest_views = None
         for label in due:
+            if label != "latest" and needs_backfill(post, label, now):
+                # 窓を過ぎてから取り直す空行: 現在値を入れると「その時点」より大きくなるので、
+                # 公開〜その時点の期間指定で復元する。対応していない媒体は空欄のまま。
+                window_raw = publisher.fetch_metrics_window(
+                    post.platform_post_id, post.published_at, window_end(post, label),
+                )
+                if not window_raw:
+                    continue
+                snap = collect_snapshot(post, label, window_raw,
+                                        followers_before=followers_before, now=now)
+                store.upsert_snapshot(snap, compute_delta=False)
+                collected += 1
+                continue
             snap = collect_snapshot(post, label, raw, followers_before=followers_before, now=now)
             if current_followers is not None:
                 if snap.followers_before is None:
@@ -884,6 +899,8 @@ def cmd_metrics(args: argparse.Namespace) -> int:
                 if bl.get("prev_date") and current_followers is not None and bl.get("prev_followers") is not None:
                     snap.followers_delta = current_followers - bl["prev_followers"]
                 store.upsert_snapshot(snap, compute_delta=False)
+            elif label in existing:
+                store.upsert_snapshot(snap, compute_delta=False)  # 空行の取り直し
             else:
                 store.append_snapshot(snap)
             collected += 1

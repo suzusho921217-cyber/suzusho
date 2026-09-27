@@ -157,6 +157,37 @@ class YouTubePublisher(Publisher):
             print(f"[youtube] 収益取得失敗（未収益化の可能性、他指標には影響なし）: {e}")
         return metrics
 
+    def fetch_metrics_window(self, platform_post_id: str, start, end) -> dict | None:
+        """YouTube Analytics で start〜end の期間の指標を合計で取る。
+
+        Analytics の日付は太平洋時間で区切られる（JST 01:20 公開は現地の前日）。
+        日単位なので end を含む日の終わりまで入る（24h なら最大で約1日ぶん多め）。
+        収益は取らない（未収益化チャンネルでは別リクエストでも 401 になるため）。
+        """
+        from zoneinfo import ZoneInfo
+
+        from google.auth.exceptions import GoogleAuthError
+        from googleapiclient.errors import HttpError
+
+        pt = ZoneInfo("America/Los_Angeles")
+        try:
+            resp = self._analytics().reports().query(
+                ids="channel==MINE",
+                startDate=start.astimezone(pt).date().isoformat(),
+                endDate=end.astimezone(pt).date().isoformat(),
+                metrics="views,likes,comments,engagedViews,averageViewDuration,shares,"
+                        "subscribersGained,videosAddedToPlaylists",
+                filters=f"video=={platform_post_id}",
+            ).execute()
+        except (HttpError, GoogleAuthError) as e:
+            print(f"[youtube] Analytics(期間指定) 取得失敗: {e}")
+            return {}
+        rows = resp.get("rows") or []
+        if not rows:
+            return {}
+        headers = [h["name"] for h in resp.get("columnHeaders", [])]
+        return dict(zip(headers, rows[0]))
+
     def fetch_account_followers(self) -> int | None:
         from google.auth.exceptions import GoogleAuthError
         from googleapiclient.errors import HttpError

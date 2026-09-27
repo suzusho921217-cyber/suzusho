@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import abc
 from dataclasses import dataclass
+from datetime import datetime
 
 from src.common.models import Brand, Platform, Post
 
@@ -56,6 +57,15 @@ class Publisher(abc.ABC):
     @abc.abstractmethod
     def fetch_metrics(self, platform_post_id: str) -> dict:
         """指標を取得する。取得できない項目は含めない（呼び出し側で再正規化）。"""
+
+    def fetch_metrics_window(
+        self, platform_post_id: str, start: datetime, end: datetime,
+    ) -> dict | None:
+        """start〜end の期間の指標（過去の 24h/72h/7d を後から復元する用）。
+
+        既定は未対応（None）。期間指定で取れる媒体だけオーバーライドする。
+        """
+        return None
 
     def fetch_account_followers(self) -> int | None:
         """このアカウント（ブランド×媒体）の現在のフォロワー/登録者数。

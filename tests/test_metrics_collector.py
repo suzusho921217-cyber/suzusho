@@ -3,7 +3,7 @@
 from datetime import datetime, timedelta, timezone
 
 from src.common.models import Brand, Platform, PolicyDecision, Post, PostStatus
-from src.metrics.collector import collect_snapshot, due_snapshots
+from src.metrics.collector import collect_snapshot, due_snapshots, needs_backfill
 
 JST = timezone(timedelta(hours=9))
 NOW = datetime(2026, 9, 10, 12, 0, tzinfo=JST)
@@ -43,6 +43,32 @@ def test_due_excludes_already_collected():
 def test_due_latest_stops_after_30d():
     assert due_snapshots(_post(published_offset_days=40), NOW,
                          existing_labels={"24h", "72h", "7d"}) == []
+
+
+def test_due_retries_empty_rows_within_grace_then_after_backfill_delay():
+    # 2026-09-20 の YouTube トークン失効中に 7d の空行が書かれ、行があるせいで
+    # 二度と取り直されなかった。空行は取り直し対象にする。
+    have = {"24h", "72h", "7d"}
+    # 7d + 半日: 猶予内なので現在値で取り直す
+    assert "7d" in due_snapshots(_post(published_offset_days=7.5), NOW,
+                                 existing_labels=have, empty_labels={"7d"})
+    # 7d + 2日: 猶予切れ・Analytics 確定待ち → まだ取らない
+    assert "7d" not in due_snapshots(_post(published_offset_days=9), NOW,
+                                     existing_labels=have, empty_labels={"7d"})
+    # 7d + 3日以降: 期間指定で復元
+    assert "7d" in due_snapshots(_post(published_offset_days=10), NOW,
+                                 existing_labels=have, empty_labels={"7d"})
+    # 30日を過ぎたらあきらめる
+    assert due_snapshots(_post(published_offset_days=40), NOW,
+                         existing_labels=have, empty_labels={"7d"}) == []
+    # 空でない行は取り直さない
+    assert "7d" not in due_snapshots(_post(published_offset_days=7.5), NOW, existing_labels=have)
+
+
+def test_needs_backfill_only_after_grace():
+    assert not needs_backfill(_post(published_offset_days=7.5), "7d", NOW)
+    assert needs_backfill(_post(published_offset_days=10), "7d", NOW)
+    assert not needs_backfill(_post(published_offset_days=10), "latest", NOW)
 
 
 def test_due_empty_when_not_published():

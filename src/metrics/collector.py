@@ -25,6 +25,14 @@ _WINDOWS: dict[str, timedelta] = {
     "7d": timedelta(days=7),
 }
 _LATEST_UNTIL = timedelta(days=30)   # これ以降は latest も更新しない
+# 24h/72h/7d の行が「取ったが空欄」(媒体の認証切れ等で取得失敗)だった場合の取り直し。
+# 2026-09-20〜21 の YouTube トークン失効中に書かれた空行が、行があるせいで
+# 二度と取り直されず空欄のまま残っていた。
+#   窓 + _RETRY_GRACE まで … 現在値で取り直す（まだ「その時点の値」とほぼ同じ）
+#   窓 + _BACKFILL_AFTER 以降 … 媒体の期間指定API(fetch_metrics_window)で当時の値を復元
+#     （YouTube Analytics は数日遅れで確定するので、確定を待ってから）
+_RETRY_GRACE = timedelta(days=1)
+_BACKFILL_AFTER = timedelta(days=3)
 
 # 生の API キー -> PerformanceSnapshot のフィールド（媒体差を吸収）
 _ALIASES: dict[str, tuple[str, ...]] = {
@@ -46,10 +54,12 @@ def due_snapshots(
     now: datetime | None = None,
     *,
     existing_labels: Iterable[str] = (),
+    empty_labels: Iterable[str] = (),
 ) -> list[str]:
     """この投稿について今回回収すべき snapshot ラベル。
 
     24h/72h/7d は「経過時間を超えていて、まだ取っていない」ものだけ。
+    ただし empty_labels（行はあるが指標が空）は取り直す（_RETRY_GRACE / _BACKFILL_AFTER）。
     latest は公開後 30 日までは毎回対象（rolling）。
     """
     now = now or datetime.now(JST)
@@ -63,10 +73,36 @@ def due_snapshots(
         return []
 
     have = set(existing_labels)
-    due = [label for label, delta in _WINDOWS.items() if age >= delta and label not in have]
+    empty = set(empty_labels)
+    due = []
+    for label, delta in _WINDOWS.items():
+        if age < delta:
+            continue
+        retry_empty = label in empty and (
+            age <= delta + _RETRY_GRACE or delta + _BACKFILL_AFTER <= age <= _LATEST_UNTIL
+        )
+        if label not in have or retry_empty:
+            due.append(label)
     if age <= _LATEST_UNTIL:
         due.append("latest")
     return due
+
+
+def window_end(post: Post, label: str) -> datetime | None:
+    """label の時点（公開 + 窓）。窓を過ぎてから取り直す行を、期間指定で復元するのに使う。"""
+    if label not in _WINDOWS or post.published_at is None:
+        return None
+    published = post.published_at
+    if published.tzinfo is None:
+        published = published.replace(tzinfo=JST)
+    return published + _WINDOWS[label]
+
+
+def needs_backfill(post: Post, label: str, now: datetime | None = None) -> bool:
+    """現在値ではなく「公開〜label の時点」の期間指定で取るべきか（窓 + 猶予を過ぎている）。"""
+    end = window_end(post, label)
+    now = now or datetime.now(JST)
+    return end is not None and now - end > _RETRY_GRACE
 
 
 def _pick(raw: Mapping[str, Any], field: str) -> Any:

@@ -160,6 +160,76 @@ def test_metrics_account_daily_records_followers_and_guard_status(tmp_path, monk
     assert row.status == "HOLD"           # guard.json 由来
 
 
+class _WindowPublisher(_FakeAccountPublisher):
+    def __init__(self):
+        super().__init__()
+        self.windows = []
+
+    def fetch_metrics_window(self, platform_post_id, start, end):
+        self.windows.append((start, end))
+        return {"views": 42, "likes": 3, "averageViewDuration": 4}
+
+
+def _published_post(key, published_at):
+    return Post(
+        post_key=key, master_video_id=key.split(":")[0], brand=Brand.CAT,
+        platform=Platform.YOUTUBE, account_id="cat-youtube", concept_tag="c",
+        hook_type="h", character_id="CAT_001", duration_sec=8, oddity_level=1,
+        prompt_version="v1", generation_cost_jpy=32.0, policy_version="v1",
+        policy_result=PolicyDecision.PASS, status=PostStatus.PUBLISHED,
+        published_at=published_at, platform_post_id="yt-" + key,
+    )
+
+
+def test_metrics_backfills_empty_fixed_snapshot_from_window(tmp_path, monkeypatch):
+    """認証切れ中に書かれた 7d の空行を、窓を過ぎた後は期間指定で当時の値に復元する。
+    今の値（views=500）を入れると「7日後」より大きくなってしまうので使わない。"""
+    from src.common.models import PerformanceSnapshot
+
+    monkeypatch.setattr(cli_module, "STATE_DIR", tmp_path)
+    pub = _WindowPublisher()
+    monkeypatch.setattr(cli_module, "get_publisher", lambda platform, brand=None: pub)
+
+    now = datetime.now(_JST)
+    published_at = now - timedelta(days=12)
+    store = LocalStore(tmp_path / "db")
+    store.upsert_post(_published_post("p3:youtube", published_at))
+    for label in ("24h", "72h"):
+        store.append_snapshot(PerformanceSnapshot(
+            post_key="p3:youtube", snapshot=label, collected_at=now, views=10))
+    store.append_snapshot(PerformanceSnapshot(
+        post_key="p3:youtube", snapshot="7d", collected_at=now - timedelta(days=5)))
+
+    assert main(["metrics"]) == 0
+
+    snaps = {s.snapshot: s for s in store.list_snapshots(post_key="p3:youtube")}
+    assert len([s for s in store.list_snapshots(post_key="p3:youtube") if s.snapshot == "7d"]) == 1
+    assert snaps["7d"].views == 42 and snaps["7d"].likes == 3
+    assert snaps["7d"].completion_rate == 0.5   # 4秒 / 8秒
+    assert snaps["latest"].views == 500
+    assert pub.windows == [(published_at, published_at + timedelta(days=7))]
+
+
+def test_metrics_retries_empty_fixed_snapshot_with_current_value_within_grace(tmp_path, monkeypatch):
+    from src.common.models import PerformanceSnapshot
+
+    monkeypatch.setattr(cli_module, "STATE_DIR", tmp_path)
+    pub = _WindowPublisher()
+    monkeypatch.setattr(cli_module, "get_publisher", lambda platform, brand=None: pub)
+
+    now = datetime.now(_JST)
+    store = LocalStore(tmp_path / "db")
+    store.upsert_post(_published_post("p4:youtube", now - timedelta(hours=30)))
+    store.append_snapshot(PerformanceSnapshot(
+        post_key="p4:youtube", snapshot="24h", collected_at=now - timedelta(hours=5)))
+
+    assert main(["metrics"]) == 0
+
+    rows = [s for s in store.list_snapshots(post_key="p4:youtube") if s.snapshot == "24h"]
+    assert len(rows) == 1 and rows[0].views == 500
+    assert pub.windows == []
+
+
 def test_full_loop_metrics_to_performance_mode_plan(published):
     main(["metrics"])
     main(["daily-learning"])  # 既定入力 = .state/performance.json
