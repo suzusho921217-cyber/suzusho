@@ -23,9 +23,9 @@ veo:
   target_total_sec: 0
 
   # 概算原価（円/秒）。予算ゲート（§13）と原価記録に使う。
-  # ★実請求で確認して更新すること（$1=¥150 換算の目安）:
-  #   Veo 3.1 Lite 720p ≈ $0.05/s → ¥8   /  1080p ≈ $0.08/s → ¥12
-  price_jpy_per_sec: 8
+  # ★2026-09 実請求から逆算: ¥5,000（税込）の前払いで 8秒×約57本 → 約 ¥11/s（税込）。
+  #   旧値 ¥8/s は約4割安く、システム上の残高より先に Google 側で止まった。
+  price_jpy_per_sec: 11
 
   # 認証: gemini-3.6-flash と同じ Gemini API キー。この順で環境変数を見る。
   api_key_envs: [GEMINI_API_KEY, GOOGLE_API_KEY]
