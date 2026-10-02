@@ -30,11 +30,16 @@ cat:
   instagram:
     always: ["#猫", "#cat", "#catstagram", "#catsofinstagram"]
     pool:
-    - '#猫の予想外のリアクション'
-    - '#擬人化猫'
-    - '#二段オチ'
-    - '#スロー猫'
-    - '#AIペット'
+    - '#ai'
+    - '#cute'
+    - '#cat'
+    - '#foryou'
+    - '#shorts'
+    - '#fyp'
+    - '#catsoftiktok'
+    - '#catvideos'
+    - '#funny'
+    - '#adorable'
     per_video: 6
   x:
     always: ["#猫", "#cat"]
@@ -58,15 +63,16 @@ dog:
   instagram:
     always: ["#犬", "#dog", "#dogstagram", "#dogsofinstagram"]
     pool:
-    - '#犬'
-    - '#ゴールデンレトリバー'
-    - '#力関係逆転'
-    - '#サイドアイ'
-    - '#AI生成'
-    - '#ペット'
-    - '#ショート動画'
-    - '#感情反転'
-    - '#赤ちゃん'
+    - '#ai'
+    - '#dog'
+    - '#foryou'
+    - '#shorts'
+    - '#fyp'
+    - '#dogsoftiktok'
+    - '#dogvideos'
+    - '#funny'
+    - '#cute'
+    - '#goldenretriever'
     per_video: 6
   x:
     always: ["#犬", "#dog"]
