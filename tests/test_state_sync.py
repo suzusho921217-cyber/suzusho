@@ -83,22 +83,29 @@ def test_pull_restores_tree(wired, monkeypatch):
     state, remote = wired
     monkeypatch.setenv("STATE_SYNC", "1")
     remote["state/winning_tags.json"] = b"tags"
-    remote["state/generation/cat-01.mp4"] = b"\x00\x01video"
+    remote["state/sub/job.json"] = b"job"
 
     assert state_sync.pull() == 2
     assert (state / "winning_tags.json").read_bytes() == b"tags"
-    assert (state / "generation" / "cat-01.mp4").read_bytes() == b"\x00\x01video"
+    assert (state / "sub" / "job.json").read_bytes() == b"job"
 
 
-def test_pull_can_skip_videos(wired, monkeypatch):
+def test_never_moves_videos_through_gcs(wired, monkeypatch):
+    """GCS 経由で mp4 を落とす/上げると転送料が跳ねる（2026-09 事故）。どちら向きも素通りさせない。"""
     state, remote = wired
     monkeypatch.setenv("STATE_SYNC", "1")
     remote["state/spend.json"] = b"{}"
     remote["state/generation/2026-09-28-cat-01.mp4"] = b"video"
 
-    assert state_sync.pull(skip_videos=True) == 1
+    assert state_sync.pull() == 1
     assert (state / "spend.json").exists()
     assert not (state / "generation").exists()
+
+    (state / "media" / "2026-10-02-cat-01").mkdir(parents=True)
+    (state / "media" / "2026-10-02-cat-01" / "youtube.mp4").write_bytes(b"new video")
+    (state / "plan.json").write_text("p")
+    assert state_sync.push() == 1
+    assert "state/media/2026-10-02-cat-01/youtube.mp4" not in remote
 
 
 def test_prune_media_drops_only_old_videos(wired, monkeypatch):

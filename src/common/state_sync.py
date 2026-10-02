@@ -114,10 +114,12 @@ def _iter_local_files() -> Iterator[tuple[Path, str]]:
             yield p, p.relative_to(STATE_DIR).as_posix()
 
 
-def pull(*, skip_videos: bool = False) -> int:
+def pull() -> int:
     """リモートの `state/` 以下を `.state/` に展開する。展開したファイル数を返す。
 
-    skip_videos=True なら mp4 は落とさない（キャッシュ初期化用。転送料を JSON 分だけにする）。
+    動画（mp4）は**絶対に**落とさない・上げない。GCS から外へのダウンロードは1GBあたり
+    約¥17かかり、mp4 込みで回したことで 2026-09 に ¥5.3万相当の転送料が出たため。
+    誤って STATE_SYNC=1 を付け直しても JSON（数MB）しか動かないようにしておく。
     """
     _pulled_md5.clear()
     if not _enabled():
@@ -132,7 +134,7 @@ def pull(*, skip_videos: bool = False) -> int:
         rel = blob.name[len(prefix) + 1 :]
         if not rel or rel.endswith("/"):
             continue
-        if skip_videos and rel.endswith(".mp4"):
+        if rel.endswith(".mp4"):
             continue
         dest = STATE_DIR / rel
         dest.parent.mkdir(parents=True, exist_ok=True)
@@ -154,6 +156,8 @@ def push() -> int:
 
     uploaded = 0
     for abs_path, rel in _iter_local_files():
+        if rel.endswith(".mp4"):
+            continue  # 動画は GCS に置かない（pull() の説明参照）
         if _pulled_md5.get(rel) == _md5_b64(abs_path):
             continue  # pull 時点から変化なし
         bucket.blob(f"{prefix}/{rel}").upload_from_filename(abs_path)
@@ -213,7 +217,7 @@ def main(argv: list[str]) -> int:
     if argv[:1] != ["seed"]:
         print("usage: python -m src.common.state_sync seed", file=sys.stderr)
         return 2
-    n = pull(skip_videos=True)
+    n = pull()
     if n == 0:
         print("[state-sync] seed: 取得 0 件（STATE_SYNC 未設定か、リモートが空）", file=sys.stderr)
         return 1

@@ -1,8 +1,8 @@
 # §5 policy_sync: 1日1回、媒体の RSS/Atom フィードを確認。新着（＝規約/ポリシー変更の
 # 可能性）を検知したら該当媒体を stale にし、非0終了 = ジョブ失敗 = 失敗通知メール。
 #
-# state 永続化: 以前は actions/cache だったが、他ワークフローと同じ GCS 共有 .state/ に統一
-# （STATE_SYNC。前回見たフィード = policy_sync_feeds.json、stale フラグ = policy_sync.json）。
+# state 永続化: 他ワークフローと同じ共有 .state/（_reusable.yml の Actions キャッシュ）
+# （前回見たフィード = policy_sync_feeds.json、stale フラグ = policy_sync.json）。
 # これで stale フラグが publish ワークフローにも伝播する（§15 の TODO を解消）。
 name: policy_sync
 on:
