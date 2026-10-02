@@ -1,0 +1,33 @@
+# 経理チェック（cli accounting / .github/workflows/accounting.yml）
+# 毎朝の点検は無料（AI を使わない計算だけ）。メールは「5日に1回の定期報告」と
+# 「異常を見つけたときの【要確認】」だけ。
+
+report_every_days: 5
+
+# 前払い（残高が尽きると止まるだけで、勝手に請求はされない）。
+# ★買い足したら purchases に1行足すこと（日付・金額）。残高 = 合計 − その日以降の使用見込み。
+prepaid:
+  veo:            # AI Studio（Gemini API）。単価は config/generation.yaml の price_jpy_per_sec
+    purchases:
+      - {date: "2026-10-02", jpy: 5000}
+  anthropic:      # console.anthropic.com
+    purchases:
+      - {date: "2026-10-02", usd: 10}
+
+# 単価（見積もり用）
+usd_jpy: 160
+claude_usd_per_mtok:          # モデル名の前方一致。{in, out}
+  claude-haiku-4-5: {in: 1.0, out: 5.0}
+  claude-sonnet-5: {in: 2.0, out: 10.0}
+claude_web_search_usd: 0.01   # 1回あたり
+gcs_egress_jpy_per_gib: 17.5  # 2026-09 実請求（Download Worldwide）から
+instagram_video_mb: 10        # Instagram が1投稿ごとに GCS から取得する動画の目安
+
+# 異常検知のしきい値（どれか1つでも超えたら即【要確認】メール。同じ内容は1日1回まで）
+anomaly:
+  veo_jobs_per_day: 4         # 通常 2本/日。再生成込みでもこれを超えたらおかしい
+  claude_calls_per_day: 25    # 通常: 会議5 + 投稿文数件
+  claude_jpy_per_day: 150
+  state_mb: 300               # 工程間で受け渡す .state/ の大きさ（通常 数十MB）
+  gcs_bucket_mb: 200          # GCS バケットの中身（通常 2MB 弱。動画が溜まり出したら事故の兆候）
+  prepaid_days_left: 3        # 前払いの残りがこの日数を切ったら知らせる

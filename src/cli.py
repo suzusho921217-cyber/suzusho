@@ -100,6 +100,7 @@ COMMANDS = [
     "kill-switch",
     "agent-mtg",
     "strategy-review",
+    "accounting",
 ]
 
 
@@ -1152,6 +1153,15 @@ def cmd_strategy_review(args: argparse.Namespace) -> int:
     return 1 if result.error else 0
 
 
+def cmd_accounting(args: argparse.Namespace) -> int:
+    """経理チェック（毎朝・無料）。使用額・前払い残高・異常を点検し、5日ごとの定期報告と
+    異常時の【要確認】だけメールする（`src/accounting/check.py`）。"""
+    from src.accounting.check import run_and_notify
+
+    run_and_notify()
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="ai-media")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -1192,6 +1202,7 @@ def main(argv: list[str] | None = None) -> int:
         "metrics": cmd_metrics,
         "agent-mtg": cmd_agent_mtg,
         "strategy-review": cmd_strategy_review,
+        "accounting": cmd_accounting,
     }
     handler = handlers.get(args.command)
     if handler is None:

@@ -46,6 +46,9 @@ def call_role(
         kwargs["tools"] = [{"type": "web_search_20250305", "name": "web_search", "max_uses": 5}]
 
     resp = _create_with_retry(client, kwargs)
+    from src.accounting.usage import record_llm_usage
+
+    record_llm_usage(kwargs["model"], resp.usage)
     return "".join(block.text for block in resp.content if block.type == "text")
 
 

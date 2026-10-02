@@ -1,0 +1,18 @@
+# 経理チェック: 毎朝の点検（無料・AI なし）。メールは5日に1回の定期報告と、
+# 異常を見つけたときの【要確認】だけ（src/accounting/check.py, config/accounting.yaml）。
+name: accounting
+on:
+  schedule:
+    - cron: "0 23 * * *"  # 08:00 JST（朝の生成 07:00 の後）
+  workflow_dispatch:
+
+concurrency:
+  group: sns-pipeline-state
+  cancel-in-progress: false
+
+jobs:
+  call:
+    uses: ./.github/workflows/_reusable.yml
+    with:
+      command: accounting
+    secrets: inherit
