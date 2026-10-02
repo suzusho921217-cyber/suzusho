@@ -124,6 +124,16 @@ GitHub Actions のランは毎回まっさらな clone から始まり `.state/`
 - Instagram 投稿だけは今も GCS を使う（動画を URL で取りに来させる仕様のため）。
   投稿処理が終わったら一時動画は消す。
 
+### 経理チェック（お金の見張り）
+
+`accounting.yml`（毎朝 08:00 JST・AI なし・無料）→ `src/accounting/check.py`。設定は `config/accounting.yaml`。
+- 今月の使用見込み（Veo / Claude API / Instagram 用 GCS 転送料）、前払いの残り日数、異常
+  （生成本数・Claude 呼び出し回数と額・受け渡しデータ量・GCS バケット量）を点検。
+- メールは **5日に1回の定期報告** と、異常時の **【要確認】**（同じ内容は1日1回）だけ。
+- Claude API は残高を API で読めないので、呼び出しごとの usage を `.state/llm_usage-<月>.json` に記録して見積もる。
+- **前払いを買い足したら `config/accounting.yaml` の `purchases` に1行足し、`config/budget.yaml` の `monthly_budget` も合わせる。**
+- Google Cloud の実請求額は読めない → Cloud Billing 予算「後払い監視」（¥300/月、クレジット除外）で補完。
+
 ## セットアップ
 
 ```bash
