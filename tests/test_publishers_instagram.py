@@ -215,3 +215,31 @@ def test_fetch_metrics_returns_empty_on_error(monkeypatch):
 
     pub = _pub(monkeypatch, get=fake_get)
     assert pub.fetch_metrics("media-1") == {}
+
+
+@pytest.mark.parametrize("final_status", ["FINISHED", "ERROR"])
+def test_publish_deletes_staged_video_after_use(monkeypatch, final_status):
+    deleted = []
+
+    class _Blob:
+        def delete(self):
+            deleted.append(True)
+
+    def upload(pub_self_path):
+        pub._staged_blob = _Blob()
+        return "https://signed.example.com/x.mp4"
+
+    def fake_post(url, data, timeout):
+        return _FakeResponse({"id": "media-1" if url.endswith("/media_publish") else "container-1"})
+
+    def fake_get(url, params, timeout):
+        return _FakeResponse({"status_code": final_status})
+
+    pub = _pub(monkeypatch, get=fake_get, post=fake_post, upload=upload)
+    monkeypatch.setenv("INSTAGRAM_POLL_INTERVAL_SEC", "0")
+
+    result = pub.publish(_req(ai_disclosure=False))
+
+    assert result.ok is (final_status == "FINISHED")
+    assert deleted == [True]  # 成功でも失敗でも一時動画は消す
+    assert pub._staged_blob is None

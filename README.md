@@ -104,19 +104,25 @@ publish 12:00/18:00/21:00、kill_switch 毎時。
 ### ワークフロー間の state 共有（§15）
 
 GitHub Actions のランは毎回まっさらな clone から始まり `.state/` が空になる。工程を
-またいで plan / jobs / spend / winning_tags / 生成済み mp4 を渡すため、`.state/` の実体を
-**GCS バケット**（`GCS_BUCKET_NAME` の `state/` プレフィックス）に置く。
+またいで plan / jobs / spend / winning_tags / 生成済み mp4 を渡すため、`.state/` を
+**GitHub Actions のキャッシュ**（無料）で引き継ぐ。
 
-- `src/common/state_sync.py`: コマンド実行の前に `pull()`（リモート → `.state/`）、
-  後に `push()`（pull 時点から**変わった/増えたファイルだけ**アップロード）。
-- 有効化は env `STATE_SYNC=1`（`_reusable.yml` と `agent_mtg.yml` で設定済み）。
-  未設定のローカル実行・pytest では完全に no-op。
-- 同時実行対策: 全パイプラインワークフローに共通の `concurrency: group: sns-pipeline-state`
-  を付け、GCS 上の state を1本ずつ順に触る。no-op で終わったランは何も push しない。
+- ⚠️ 2026-10-01 までは GCS バケットの `state/` に置き、毎ランで mp4 込み全部（最大約1.3GB）を
+  ダウンロードしていた → 9月だけで Cloud Storage 転送料 3,069GiB / ¥53,515（新規無料
+  クレジットで大半相殺・実請求 ¥6,501）。**GCS を工程間の受け渡しに使い直さないこと。**
+- 各ワークフロー（`_reusable.yml` / `agent_mtg.yml` / `strategy_review.yml`）が
+  `actions/cache/restore`（キー `sns-state-` の最新）→ 実行 → 中身が変わったときだけ
+  `actions/cache/save`。復元できないときは**空のまま走らせず失敗**（予算消化額を失わない）。
+- 保存前に企画日が3日より前の動画を消す（env `STATE_PRUNE_DAYS=3` →
+  `state_sync.prune_media()`）。キャッシュは JSON＋直近の動画だけ。
+- キャッシュが全部消えた（7日間アクセス無し等）ときは、最後の成果物（各ランの
+  `state-*` artifact）から戻すか、`state_seed.yml` を手動実行（GCS の旧 `state/` から
+  JSON だけを取る。移行時に1回使用済み）。
+- 同時実行対策: 全パイプラインワークフローに共通の `concurrency: group: sns-pipeline-state`。
 - `generate` は1日複数回走るが冪等（`jobs-<date>.json` に投入済みのプランは再投入しない）。
   plan がまだ無い時刻に起動しても失敗ではなくスキップ（exit 0）。
-- `spend.json`（生成費の積み上げ）は予算ゲートの起点なので必ず引き継ぐ。移行時に現在値を
-  `state/spend.json` へ手で seed 済み。
+- Instagram 投稿だけは今も GCS を使う（動画を URL で取りに来させる仕様のため）。
+  投稿処理が終わったら一時動画は消す。
 
 ## セットアップ
 

@@ -63,6 +63,7 @@ class InstagramPublisher(Publisher):
     def __init__(self, brand: Brand | None = None) -> None:
         super().__init__(brand)
         self._storage_client = None
+        self._staged_blob = None  # Instagram に取りに来させるため一時的に置いた動画
 
     # --- Publisher ---------------------------------------------------------
 
@@ -83,6 +84,10 @@ class InstagramPublisher(Publisher):
             media_id = self._publish_container(container_id)
         except (requests.RequestException, _GraphAPIError) as e:
             return PublishResult(ok=False, error=str(e))
+        finally:
+            # 取得が済んだ（か失敗した）一時動画は残さない。以前は消しておらず、
+            # 投稿ごとに GCS の保存料が積み上がっていた（2026-10-02 修正）。
+            self._delete_staged()
         return PublishResult(ok=True, platform_post_id=media_id)
 
     def find_existing(self, post: Post) -> str | None:
@@ -220,10 +225,20 @@ class InstagramPublisher(Publisher):
         name = f"{uuid.uuid4().hex}.mp4"
         blob = bucket.blob(name)
         blob.upload_from_filename(local_path, content_type="video/mp4")
+        self._staged_blob = blob
         expire_min = int(env("GCS_SIGNED_URL_EXPIRE_MIN", "60") or 60)
         return blob.generate_signed_url(
             version="v4", expiration=timedelta(minutes=expire_min), method="GET",
         )
+
+    def _delete_staged(self) -> None:
+        blob, self._staged_blob = self._staged_blob, None
+        if blob is None:
+            return
+        try:
+            blob.delete()
+        except Exception as e:  # noqa: BLE001 - 掃除の失敗で投稿結果を変えない
+            print(f"[instagram] 一時動画の削除に失敗（GCS に残る）: {e}")
 
 
 class _GraphAPIError(RuntimeError):
