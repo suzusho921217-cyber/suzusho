@@ -7,7 +7,7 @@ on:
     - cron: "0 1 * * *"   # 10:00 JST（取りこぼし・追加プランの再投入）
   workflow_dispatch:
 
-# 全パイプラインワークフローで共有。GCS 上の .state/ を1本ずつ順に触る。
+# 全パイプラインワークフローで共有。Actions キャッシュ上の .state/ を1本ずつ順に触る。
 concurrency:
   group: sns-pipeline-state
   cancel-in-progress: false

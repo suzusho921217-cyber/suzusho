@@ -88,3 +88,41 @@ def test_pull_restores_tree(wired, monkeypatch):
     assert state_sync.pull() == 2
     assert (state / "winning_tags.json").read_bytes() == b"tags"
     assert (state / "generation" / "cat-01.mp4").read_bytes() == b"\x00\x01video"
+
+
+def test_pull_can_skip_videos(wired, monkeypatch):
+    state, remote = wired
+    monkeypatch.setenv("STATE_SYNC", "1")
+    remote["state/spend.json"] = b"{}"
+    remote["state/generation/2026-09-28-cat-01.mp4"] = b"video"
+
+    assert state_sync.pull(skip_videos=True) == 1
+    assert (state / "spend.json").exists()
+    assert not (state / "generation").exists()
+
+
+def test_prune_media_drops_only_old_videos(wired, monkeypatch):
+    import datetime as dt
+
+    state, _ = wired
+    gen = state / "generation"
+    gen.mkdir()
+    (gen / "2026-09-28-cat-01.mp4").write_bytes(b"old")
+    (gen / "2026-09-30-cat-01.mp4").write_bytes(b"keep")
+    media = state / "media"
+    (media / "2026-09-28-cat-01").mkdir(parents=True)
+    (media / "2026-09-28-cat-01" / "youtube.mp4").write_bytes(b"old")
+    (media / "2026-10-01-dog-02").mkdir()
+    (media / "2026-10-01-dog-02" / "youtube.mp4").write_bytes(b"keep")
+    (state / "media-2026-09-01.json").write_text("{}")  # JSON は対象外
+
+    # 未設定なら何もしない（ローカルの動画を消さない）
+    monkeypatch.delenv("STATE_PRUNE_DAYS", raising=False)
+    assert state_sync.prune_media(today=dt.date(2026, 10, 2)) == 0
+
+    assert state_sync.prune_media(3, today=dt.date(2026, 10, 2)) == 2
+    assert not (gen / "2026-09-28-cat-01.mp4").exists()
+    assert (gen / "2026-09-30-cat-01.mp4").exists()
+    assert not (media / "2026-09-28-cat-01").exists()
+    assert (media / "2026-10-01-dog-02" / "youtube.mp4").exists()
+    assert (state / "media-2026-09-01.json").exists()

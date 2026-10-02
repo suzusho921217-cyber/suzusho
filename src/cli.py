@@ -1208,6 +1208,11 @@ def main(argv: list[str] | None = None) -> int:
             state_sync.push()
         except Exception as e:  # noqa: BLE001 - push 失敗で本処理の結果を隠さない
             print(f"[state-sync] push 失敗（この実行の .state は次回まで共有されない）: {e}")
+        # 古い動画を消してから Actions キャッシュに保存させる（env STATE_PRUNE_DAYS のときだけ）
+        try:
+            state_sync.prune_media()
+        except Exception as e:  # noqa: BLE001 - 掃除の失敗で本処理の結果を隠さない
+            print(f"[state-sync] prune 失敗: {e}")
 
 
 if __name__ == "__main__":

@@ -1,4 +1,13 @@
-"""ワークフロー間で `.state/` を引き継ぐための共有ストア（GCS）。
+"""ワークフロー間で `.state/` を引き継ぐための共有ストア。
+
+★2026-10-02 から本番の引き継ぎは GitHub Actions のキャッシュ（無料）に移した。
+  GCS 版は毎ランで mp4 込みの state/ 全体（約1.3GB）をダウンロードし、9月だけで
+  転送料 ¥5.3万相当（3,069GiB）が発生したため。キャッシュの復元/保存はワークフロー
+  側（`.github/workflows/_reusable.yml` ほか）で行い、Python 側は
+  `prune_media()` で古い mp4 を消してキャッシュを小さく保つだけ。
+  GCS 版の pull/push は、キャッシュを初期化する `seed`（JSON のみ・1回きり）用に残す。
+
+--- 以下は GCS 版の説明 ---
 
 GitHub Actions のワークフローはランごとに `git clone` からやり直すため `.state/` が空に
 なる。`plan_daily` が作った `plan-<date>.json` を `generate` が読めない、といった連鎖で
@@ -31,7 +40,11 @@ from __future__ import annotations
 
 import base64
 import hashlib
+import re
+import shutil
+import sys
 from collections.abc import Iterator
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from src.common.config import env
@@ -101,8 +114,11 @@ def _iter_local_files() -> Iterator[tuple[Path, str]]:
             yield p, p.relative_to(STATE_DIR).as_posix()
 
 
-def pull() -> int:
-    """リモートの `state/` 以下を `.state/` に展開する。展開したファイル数を返す。"""
+def pull(*, skip_videos: bool = False) -> int:
+    """リモートの `state/` 以下を `.state/` に展開する。展開したファイル数を返す。
+
+    skip_videos=True なら mp4 は落とさない（キャッシュ初期化用。転送料を JSON 分だけにする）。
+    """
     _pulled_md5.clear()
     if not _enabled():
         return 0
@@ -115,6 +131,8 @@ def pull() -> int:
     for blob in bucket.list_blobs(prefix=f"{prefix}/"):
         rel = blob.name[len(prefix) + 1 :]
         if not rel or rel.endswith("/"):
+            continue
+        if skip_videos and rel.endswith(".mp4"):
             continue
         dest = STATE_DIR / rel
         dest.parent.mkdir(parents=True, exist_ok=True)
@@ -143,3 +161,64 @@ def push() -> int:
 
     print(f"[state-sync] push: {uploaded} ファイルを更新（gs://{_bucket_name()}/{prefix}/）")
     return uploaded
+
+
+# 動画は日付で始まる名前で置かれる:
+#   .state/generation/2026-09-28-cat-01.mp4
+#   .state/media/2026-09-28-cat-01/youtube.mp4
+_DATED = re.compile(r"^(\d{4}-\d{2}-\d{2})-")
+_VIDEO_DIRS = ("generation", "media")
+
+
+def prune_media(keep_days: int | None = None, *, today=None) -> int:
+    """`.state/` の generation/ と media/ から、企画日が keep_days 日より前の動画を消す。
+
+    キャッシュに載せる量を「直近数日の投稿待ち動画＋JSON」に抑えるため。消した数を返す。
+    keep_days 未指定なら env ``STATE_PRUNE_DAYS``。それも無ければ何もしない（ローカルで
+    手元の動画を勝手に消さない）。
+    """
+    if keep_days is None:
+        raw = (env("STATE_PRUNE_DAYS", "") or "").strip()
+        if not raw:
+            return 0
+        keep_days = int(raw)
+    if today is None:
+        today = datetime.now(timezone(timedelta(hours=9))).date()
+    cutoff = (today - timedelta(days=keep_days)).isoformat()
+
+    removed = 0
+    for sub in _VIDEO_DIRS:
+        base = STATE_DIR / sub
+        if not base.is_dir():
+            continue
+        for entry in base.iterdir():
+            m = _DATED.match(entry.name)
+            if not m or m.group(1) >= cutoff:
+                continue
+            if entry.is_dir():
+                shutil.rmtree(entry)
+            else:
+                entry.unlink()
+            removed += 1
+    if removed:
+        print(f"[state-sync] prune: {cutoff} より前の動画 {removed} 件を削除")
+    return removed
+
+
+def main(argv: list[str]) -> int:
+    """`python -m src.common.state_sync seed` … GCS から JSON だけ取って `.state/` を作る。
+
+    Actions キャッシュが空のとき（移行直後）に `state_seed.yml` から1回だけ使う。
+    """
+    if argv[:1] != ["seed"]:
+        print("usage: python -m src.common.state_sync seed", file=sys.stderr)
+        return 2
+    n = pull(skip_videos=True)
+    if n == 0:
+        print("[state-sync] seed: 取得 0 件（STATE_SYNC 未設定か、リモートが空）", file=sys.stderr)
+        return 1
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))

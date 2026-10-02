@@ -1,0 +1,42 @@
+# Actions キャッシュの初期化（1回きり・手動）。
+# .state/ の引き継ぎを GCS → Actions キャッシュに移したとき（2026-10-02）、キャッシュが
+# 空だと各ワークフローは「復元できない」で止まる。GCS に残っている最新の state/ から
+# JSON だけ（約2MB。動画は落とさない＝転送料ほぼゼロ）を取り、最初のキャッシュとして保存する。
+# 以後は各ワークフローがキャッシュを引き継ぐので、通常は二度と使わない。
+name: state_seed
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: sns-pipeline-state
+  cancel-in-progress: false
+
+jobs:
+  seed:
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - run: pip install -r requirements.txt
+
+      - name: GCS から JSON だけ取得
+        env:
+          STATE_SYNC: "1"
+          GOOGLE_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
+          GCS_BUCKET_NAME: ${{ secrets.GCS_BUCKET_NAME }}
+          GOOGLE_CLOUD_PROJECT: ${{ secrets.GOOGLE_CLOUD_PROJECT }}
+        run: |
+          python -m src.common.state_sync seed
+          find .state -type f | sort
+
+      - name: 最初のキャッシュとして保存
+        uses: actions/cache/save@v4
+        with:
+          path: .state
+          key: sns-state-seed-${{ github.run_id }}

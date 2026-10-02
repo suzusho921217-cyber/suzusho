@@ -23,6 +23,22 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # ワークフロー間の .state/ 引き継ぎ（§15）。GitHub Actions のキャッシュ（無料）を使う。
+      # 以前は GCS から毎回 mp4 込みで全部落としていて転送料が高額になった（2026-10-02 移行）。
+      # 復元できない＝引き継ぐ状態が無い（予算の消化額も分からない）ので、空のまま走らせず止める。
+      - name: 状態の復元（Actions キャッシュ）
+        id: restore
+        uses: actions/cache/restore@v4
+        with:
+          path: .state
+          key: sns-state-${{ github.run_id }}-${{ github.run_attempt }}-strategy-review
+          restore-keys: sns-state-
+          fail-on-cache-miss: true
+
+      - name: 状態の指紋（実行前）
+        id: before
+        run: echo "sum=$(find .state -type f -print0 | sort -z | xargs -0 md5sum | md5sum | cut -c1-32)" >> "$GITHUB_OUTPUT"
+
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
@@ -40,11 +56,23 @@ jobs:
           GMAIL_SENDER_ADDRESS: ${{ secrets.GMAIL_SENDER_ADDRESS }}
           GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
           ALERT_EMAIL_TO: ${{ secrets.ALERT_EMAIL_TO }}
-          # 共有 .state/ を読み書き（各媒体の現在地を読む / strategy-<date>.json を残す）
-          STATE_SYNC: "1"
-          GCS_BUCKET_NAME: ${{ secrets.GCS_BUCKET_NAME }}
-          GOOGLE_CLOUD_PROJECT: ${{ secrets.GOOGLE_CLOUD_PROJECT }}
+          # 企画日が3日より前の動画は消してからキャッシュに保存する（キャッシュを小さく保つ）
+          STATE_PRUNE_DAYS: "3"
         run: python -m src.cli strategy-review
+
+      - name: 状態の指紋（実行後）
+        id: after
+        if: always() && steps.restore.outcome == 'success'
+        run: echo "sum=$(find .state -type f -print0 | sort -z | xargs -0 md5sum | md5sum | cut -c1-32)" >> "$GITHUB_OUTPUT"
+
+      # 変化があったときだけ新しいキャッシュとして保存（次のランは最新のものを復元する）。
+      # 復元に失敗したランは保存しない（空や途中の状態で上書きしないため）。
+      - name: 状態の保存（Actions キャッシュ）
+        if: always() && steps.restore.outcome == 'success' && steps.after.outputs.sum != steps.before.outputs.sum
+        uses: actions/cache/save@v4
+        with:
+          path: .state
+          key: sns-state-${{ github.run_id }}-${{ github.run_attempt }}-strategy-review
 
       - name: 状態退避
         if: always()
