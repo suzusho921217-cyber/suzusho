@@ -10,7 +10,6 @@
 from __future__ import annotations
 
 import json
-from dataclasses import asdict
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -35,7 +34,12 @@ def _latest_state(glob: str) -> Path | None:
     return matches[-1] if matches else None
 
 
-def _performance_summary(store) -> str:
+def _performance_summary(store, *, recent: int = 30) -> str:
+    """投稿実績。媒体×ブランドの集計（最初/最後の投稿日・本数・再生）＋新しい順の直近 recent 本。
+
+    以前は全投稿を古い順に JSON 化して 8,000 文字で切っていたため、9/6 頃より後の投稿が
+    会議から見えず「YouTube 投稿が 9/6 で停止」と誤認された（2026-10-03 修正）。
+    """
     posts = [
         p for p in store.list_posts()
         if p.status is PostStatus.PUBLISHED and p.platform_post_id
@@ -43,19 +47,40 @@ def _performance_summary(store) -> str:
     if not posts:
         return "まだ公開済みの投稿が無い"
 
+    metric_keys = ("views", "likes", "comments", "shares", "saved", "avg_watch_sec", "views_delta")
     records = []
     for post in posts:
         snaps = store.list_snapshots(post_key=post.post_key)
         latest = next((s for s in snaps if s.snapshot == "latest"), None)
+        m = {k: getattr(latest, k) for k in metric_keys if latest and getattr(latest, k) is not None}
         records.append({
-            "post_key": post.post_key, "brand": post.brand.value,
-            "platform": post.platform.value, "concept_tag": post.concept_tag,
-            "hook_type": post.hook_type,
-            "published_at": post.published_at.isoformat() if post.published_at else None,
-            "generation_cost_jpy": post.generation_cost_jpy,
-            "latest_snapshot": asdict(latest) if latest else None,
+            "published_at": post.published_at.isoformat()[:16] if post.published_at else "",
+            "brand": post.brand.value, "platform": post.platform.value,
+            "concept_tag": post.concept_tag, "hook_type": post.hook_type, **m,
         })
-    return json.dumps(records, ensure_ascii=False, indent=2, default=str)[:8000]
+    records.sort(key=lambda r: r["published_at"], reverse=True)
+
+    groups: dict[tuple[str, str], list[dict]] = {}
+    for r in records:
+        groups.setdefault((r["platform"], r["brand"]), []).append(r)
+    summary = []
+    for (platform, brand), rs in sorted(groups.items()):
+        dated = [r["published_at"] for r in rs if r["published_at"]]
+        views = [r.get("views") or 0 for r in rs]
+        last7 = sorted(views[:7])
+        summary.append({
+            "platform": platform, "brand": brand, "投稿数": len(rs),
+            "最初の投稿": min(dated)[:10] if dated else None,
+            "最新の投稿": max(dated)[:10] if dated else None,
+            "総再生": sum(views),
+            "直近7本の再生中央値": last7[len(last7) // 2] if last7 else 0,
+        })
+    return (
+        "### 媒体×ブランドの集計（全期間。最新の投稿日はここが正）\n"
+        + json.dumps(summary, ensure_ascii=False, indent=1)
+        + f"\n### 直近 {min(recent, len(records))} 本（新しい順。全 {len(records)} 本のうち）\n"
+        + json.dumps(records[:recent], ensure_ascii=False, default=str)
+    )
 
 
 _EXECUTION_NOTE = """\
@@ -224,7 +249,11 @@ def _spend_summary(budget: dict) -> str:
     import calendar
 
     spend = _read_json(STATE_DIR / "spend.json") or {}
-    month = float(spend.get("month", 0.0))
+    # spend.json の月は「その月の最初の generate」で切り替わる。会議（05:37）は
+    # generate（07:00）より前に走るので、月初は前月の値が残っている。前月分なら0扱い
+    # （2026-10-03 に9月分を今月分と読んで「残り¥1,134で停止危機」と誤認した）。
+    this_month = datetime.now(timezone(timedelta(hours=9))).strftime("%Y-%m")
+    month = float(spend.get("month", 0.0)) if spend.get("month_key") == this_month else 0.0
     monthly_budget = float(budget.get("monthly_budget", 5000) or 5000)
     stop_at = monthly_budget * float(budget.get("automatic_stop_ratio", 0.95))
     # 前払いクレジット（total_investment_cap）は月が変わっても戻らない。月次と両方の
@@ -244,7 +273,24 @@ def _spend_summary(budget: dict) -> str:
     days_left = calendar.monthrange(today.year, today.month)[1] - today.day + 1
     daily_cost = per_video * slots
     days_covered = int(remaining // daily_cost) if daily_cost else 999
+    # 実際の前払い残高（購入額 − 生成の見積もり。config/accounting.yaml）。こちらが尽きると Google 側で止まる。
+    prepaid_remaining = None
+    try:
+        from src.accounting.check import _prepaid, _veo_jobs
+
+        acc = load("accounting")
+        veo = _prepaid(acc["prepaid"]["veo"]["purchases"], "jpy",
+                       [(j["_date"], float(j.get("cost_jpy") or 0)) for j in _veo_jobs(STATE_DIR)],
+                       today)
+        prepaid_remaining = veo.get("remaining")
+        if prepaid_remaining is not None:
+            remaining = min(remaining, prepaid_remaining)
+            days_covered = int(remaining // daily_cost) if daily_cost else 999
+    except Exception as e:  # noqa: BLE001 - 経理設定が読めなくても会議は続ける
+        print(f"[mtg] 前払い残高の計算に失敗: {e}")
+
     return json.dumps({
+        "Veo前払いの残り見込み(購入額−使用見込み)": prepaid_remaining,
         "今月の生成費": round(month),
         "前払いクレジットの累計消化": round(total),
         "前払いクレジットの停止までの残り(月をまたいでも戻らない)": round(total_remaining),
