@@ -1,0 +1,16 @@
+# 型カードだけを手動で作る（会議・Claude なし。無料枠の Gemini キーのみ使用）。
+# 通常は毎朝の agent_mtg の中で自動で作られる。すぐ確認したいときや、取りこぼしの補充用。
+name: pattern_cards
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: sns-pipeline-state
+  cancel-in-progress: false
+
+jobs:
+  call:
+    uses: ./.github/workflows/_reusable.yml
+    with:
+      command: pattern-cards
+    secrets: inherit

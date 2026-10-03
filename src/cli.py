@@ -101,6 +101,7 @@ COMMANDS = [
     "agent-mtg",
     "strategy-review",
     "accounting",
+    "pattern-cards",
 ]
 
 
@@ -1170,6 +1171,14 @@ def cmd_accounting(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_pattern_cards(args: argparse.Namespace) -> int:
+    """競合の異常値動画を集め、未分析分を型カードにする（会議・Claude なしで単独実行。無料）。"""
+    from src.mtg.outliers import gather_outlier_report
+
+    print(gather_outlier_report())
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="ai-media")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -1211,6 +1220,7 @@ def main(argv: list[str] | None = None) -> int:
         "agent-mtg": cmd_agent_mtg,
         "strategy-review": cmd_strategy_review,
         "accounting": cmd_accounting,
+        "pattern-cards": cmd_pattern_cards,
     }
     handler = handlers.get(args.command)
     if handler is None:
