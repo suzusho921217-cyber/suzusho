@@ -148,6 +148,12 @@ def cmd_plan_daily(args: argparse.Namespace) -> int:
         banned = (brands_cfg.get(p.brand.value, {}) or {}).get("banned_expressions", [])
         p.prompt_text = render_prompt(p, char, banned)
 
+    # 模倣企画: 型カード（競合の伸びた動画を実際に見た分析）から台本を作り直す（無料枠 Gemini）
+    from src.planner import mimic
+
+    for line in mimic.apply(plans):
+        print(f"[plan-daily] mimic {line}")
+
     # プロンプト段階のポリシー判定（§7 1段目）。媒体ごとに評価して記録する。
     policy_precheck: dict[str, dict] = {}
     for p in plans:
