@@ -83,12 +83,44 @@ def trending_hashtags(videos: list[dict], *, top: int = 12) -> dict[str, list[di
             for b, c in counts.items()}
 
 
+def _research_cfg() -> dict:
+    try:
+        from src.common.config import load
+
+        return load("research") or {}
+    except Exception:  # noqa: BLE001 - 設定が読めなくても既定のワードで続ける
+        return {}
+
+
+def _watch_channel_video_ids(key: str, channels: list[str], after: str) -> list[str]:
+    """定点観測チャンネルの新着（最大10本/チャンネル）の動画ID。@ハンドルも UC…ID も可。"""
+    ids: list[str] = []
+    for ch in channels[:20]:
+        ch = str(ch).strip()
+        params = {"forHandle": ch} if ch.startswith("@") else {"id": ch}
+        try:
+            info = _get("channels", key, part="contentDetails", **params).get("items", [])
+            if not info:
+                continue
+            uploads = info[0]["contentDetails"]["relatedPlaylists"]["uploads"]
+            items = _get("playlistItems", key, part="contentDetails", playlistId=uploads,
+                         maxResults=10).get("items", [])
+        except Exception as e:  # noqa: BLE001 - 1チャンネルの失敗で調査全体を止めない
+            print(f"[outliers] 定点観測 {ch} を取得できず: {e}")
+            continue
+        ids += [i["contentDetails"]["videoId"] for i in items
+                if i.get("contentDetails", {}).get("videoPublishedAt", "") >= after]
+    return ids
+
+
 def collect_outliers(key: str, *, now: datetime | None = None, tag_sink: dict | None = None) -> list[dict]:
-    """異常値の高い順に最大_TOP_N件。"""
+    """異常値の高い順に最大_TOP_N件。検索ワードと定点観測チャンネルは config/research.yaml。"""
     now = now or datetime.now(timezone.utc)
     after = (now - timedelta(days=_LOOKBACK_DAYS)).strftime("%Y-%m-%dT%H:%M:%SZ")
-    ids: list[str] = []
-    for q in _QUERIES:
+    cfg = _research_cfg()
+    queries = list(cfg.get("queries") or _QUERIES)[:20]
+    ids: list[str] = _watch_channel_video_ids(key, list(cfg.get("watch_channels") or []), after)
+    for q in queries:
         data = _get(
             "search", key, part="id", q=q, type="video", videoDuration="short",
             order="viewCount", publishedAfter=after, maxResults=25,

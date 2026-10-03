@@ -94,3 +94,10 @@ def test_script_with_humans_is_rewritten_or_dropped(tmp_path, monkeypatch):
     q = _plan("2026-10-04-dog-02")
     mimic.apply([q], client=SimpleNamespace(models=SimpleNamespace(generate_content=gen2)))
     assert q.prompt_text == PROMPT and q.concept_tag == "あるある"   # 守れなければ通常企画のまま
+
+
+def test_pinned_and_retired_cards():
+    assert mimic.pick_card(CARDS, {}, "dog", set(), pinned=["AAA"])[0] == "AAA"   # 指名が比率より優先
+    assert mimic.pick_card(CARDS, {}, "dog", set(), retired=["BBB"])[0] == "AAA"  # 引退した型は使わない
+    log = {"AAA|dog": ["p1"]}
+    assert mimic.pick_card(CARDS, log, "dog", set(), pinned=["BBB"])[0] == "AAA"  # 途中の型は最後まで

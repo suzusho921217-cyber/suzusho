@@ -22,6 +22,13 @@ auto_apply に入れないよう指示済みだが、ここでも構造的に不
                       尺・広告・monthly_budget 自体は変えられない。実際の停止は
                       generate 側の予算ゲート（95%到達で新規生成停止）が最終的に守る。
 
+  - add_research_query / remove_research_query: config/research.yaml の競合検索ワード（最大20）
+  - add_watch_channel / remove_watch_channel: 定点観測するベンチマークチャンネル（@ハンドル or UC…ID、最大20）
+  - pin_pattern_card / retire_pattern_card: config/mimic.yaml。次に真似る型を指名／もう真似ない型を外す
+                      （型カードの動画ID or URL）
+  （2026-10-03 追加。会議が「ムリ」と言うだけで打ち手を持たなかったため、費用のかからない
+   調査範囲と模倣対象を自分で動かせるようにした）
+
 コメント・整形を保つため ruamel.yaml のラウンドトリップローダを使う。
 """
 
@@ -217,7 +224,61 @@ def apply_set_hashtags(brand: str, platform: str, tags: list[str]) -> str:
     return f"[applied] {brand}/{platform} のハッシュタグpoolを{len(tags)}件に更新"
 
 
+def _video_id(ref: str) -> str:
+    import re
+
+    ref = str(ref or "").strip()
+    m = re.search(r"(?:shorts/|v=)([\w-]{6,})", ref)
+    vid = m.group(1) if m else ref
+    if not re.fullmatch(r"[\w-]{6,20}", vid):
+        raise ApplyError(f"動画IDとして読めない: {ref!r}")
+    return vid
+
+
+def _edit_list(file: str, key: str, value: str, *, add: bool, limit: int, label: str) -> str:
+    value = str(value or "").strip()
+    if not value or len(value) > 80:
+        raise ApplyError(f"{label} が空、または長すぎる")
+    path = CONFIG_DIR / file
+    data = _load(path)
+    items = data.get(key) or []
+    if add:
+        if value in items:
+            return f"[skipped] {label}「{value}」は既にある"
+        if len(items) >= limit:
+            raise ApplyError(f"{label} は最大{limit}件（先に remove で減らす）")
+        items.append(value)
+    else:
+        if value not in items:
+            return f"[skipped] {label}「{value}」は無い"
+        items.remove(value)
+    data[key] = items
+    _dump(path, data)
+    return f"[applied] {label}「{value}」を{'追加' if add else '削除'}"
+
+
+def _channel(ref: str) -> str:
+    ref = str(ref or "").strip()
+    if not ref.startswith(("@", "UC")):
+        raise ApplyError(f"チャンネルは @ハンドル か UC…ID で指定: {ref!r}")
+    return ref
+
+
 _HANDLERS = {
+    "add_research_query": lambda item: _edit_list(
+        "research.yaml", "queries", item.get("query"), add=True, limit=20, label="競合検索ワード"),
+    "remove_research_query": lambda item: _edit_list(
+        "research.yaml", "queries", item.get("query"), add=False, limit=20, label="競合検索ワード"),
+    "add_watch_channel": lambda item: _edit_list(
+        "research.yaml", "watch_channels", _channel(item.get("channel")), add=True, limit=20,
+        label="定点観測チャンネル"),
+    "remove_watch_channel": lambda item: _edit_list(
+        "research.yaml", "watch_channels", _channel(item.get("channel")), add=False, limit=20,
+        label="定点観測チャンネル"),
+    "pin_pattern_card": lambda item: _edit_list(
+        "mimic.yaml", "pinned", _video_id(item.get("video")), add=True, limit=10, label="優先して真似る型"),
+    "retire_pattern_card": lambda item: _edit_list(
+        "mimic.yaml", "retired", _video_id(item.get("video")), add=True, limit=200, label="もう真似ない型"),
     "add_concept_tag": lambda item: apply_add_concept_tag(item.get("brand"), item.get("tag")),
     "add_hook_type": lambda item: apply_add_hook_type(item.get("brand"), item.get("hook")),
     "retire_concept_tag": lambda item: apply_retire_concept_tag(

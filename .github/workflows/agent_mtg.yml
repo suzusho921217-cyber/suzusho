@@ -98,7 +98,7 @@ jobs:
           fi
           git config user.name "agent-mtg[bot]"
           git config user.email "agent-mtg@users.noreply.github.com"
-          git add config/planning.yaml config/hashtags.yaml
+          git add config/planning.yaml config/hashtags.yaml config/scoring.yaml config/research.yaml config/mimic.yaml
           git commit -q -m "agent-mtg: 自動反映（費用・ポリシー無関係の企画/ハッシュタグのみ）"
           # push 時点で main が先に進んでいたら rebase して再試行。それでも
           # push できなくても workflow は失敗させない（翌日の実行で反映される）。

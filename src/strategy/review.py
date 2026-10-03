@@ -259,6 +259,25 @@ def _email_body(result: StrategyResult) -> str:
             body = f"<p style='margin:0'>{esc(str(v))}</p>"
         p.append(f"<h3 style='margin:16px 0 4px'>{label}</h3>{body}")
 
+    exps = cj.get("experiments") or []
+    if exps:
+        rows = "".join(
+            "<tr>" + "".join(
+                f"<td style='padding:4px 8px;border:1px solid #ddd'>{esc(str(x))}</td>"
+                for x in (e.get("what", ""), e.get("how", ""), e.get("deadline", ""),
+                          e.get("success_metric", ""), f"¥{(e.get('cost_jpy_per_month') or 0):,.0f}/月",
+                          e.get("evidence", ""))
+            ) + "</tr>"
+            for e in exps if isinstance(e, dict)
+        )
+        p.append(
+            "<h3 style='margin:16px 0 4px'>🧪 今週の実験</h3>"
+            "<table style='border-collapse:collapse;font-size:13px'><tr>"
+            + "".join(f"<th style='padding:4px 8px;border:1px solid #ddd'>{h}</th>"
+                      for h in ("何を", "手段", "期限", "成功の判定", "費用", "根拠"))
+            + f"</tr>{rows}</table>"
+        )
+
     needs = cj.get("needs_user_approval") or []
     if needs:
         li = ""

@@ -173,3 +173,27 @@ def test_apply_all_continues_after_one_failure(config_dir):
     assert "[applied]" in results[0]
     assert "[rejected]" in results[1]
     assert "[applied]" in results[2]
+
+
+def test_research_and_mimic_levers(tmp_path, monkeypatch):
+    from src.mtg import apply as ap
+
+    (tmp_path / "research.yaml").write_text("queries:\n  - 猫 ショート\nwatch_channels: []\n")
+    (tmp_path / "mimic.yaml").write_text("pinned: []\nretired: []\n")
+    monkeypatch.setattr(ap, "CONFIG_DIR", tmp_path)
+    out = ap.apply_all([
+        {"kind": "add_research_query", "query": "AI 猫 物語"},
+        {"kind": "add_research_query", "query": "猫 ショート"},
+        {"kind": "add_watch_channel", "channel": "@Afrehmation"},
+        {"kind": "add_watch_channel", "channel": "https://evil.example"},
+        {"kind": "pin_pattern_card", "video": "https://www.youtube.com/shorts/HsitED7r77I"},
+        {"kind": "retire_pattern_card", "video": "nGGmzoWCSlY"},
+        {"kind": "retire_pattern_card", "video": "not a video id!"},
+    ])
+    assert out[0].startswith("[applied]") and out[1].startswith("[skipped]")
+    assert out[2].startswith("[applied]") and out[3].startswith("[rejected]")
+    assert out[4].startswith("[applied]") and out[5].startswith("[applied]") and out[6].startswith("[rejected]")
+    research = (tmp_path / "research.yaml").read_text()
+    assert "AI 猫 物語" in research and "@Afrehmation" in research
+    mim = (tmp_path / "mimic.yaml").read_text()
+    assert "HsitED7r77I" in mim and "nGGmzoWCSlY" in mim

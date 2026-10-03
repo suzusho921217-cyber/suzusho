@@ -59,14 +59,35 @@ def _read(path: Path, default):
         return default
 
 
-def pick_card(cards: dict, log: dict, brand: str, taken: set[str]) -> tuple[str, dict] | None:
-    """ブランドごとに、途中の型を優先して3本まで。次に登録者比の高い未使用の型。"""
+def _mimic_cfg() -> dict:
+    try:
+        from src.common.config import load
+
+        return load("mimic") or {}
+    except Exception:  # noqa: BLE001
+        return {}
+
+
+def pick_card(cards: dict, log: dict, brand: str, taken: set[str],
+              *, pinned: list[str] | None = None, retired: list[str] | None = None) -> tuple[str, dict] | None:
+    """ブランドごとに、途中の型を優先して3本まで。次に会議が指名した型（pinned）、次に登録者比の高い型。
+
+    retired（会議が「もう真似ない」とした型）は使わない。
+    """
+    pinned = list(pinned or [])
+    retired = set(retired or [])
     usable = [(vid, c) for vid, c in cards.items()
-              if c.get("mimicable") and vid not in taken
+              if c.get("mimicable") and vid not in taken and vid not in retired
               and len(log.get(f"{vid}|{brand}", [])) < USES_PER_CARD]
     if not usable:
         return None
-    usable.sort(key=lambda x: (-len(log.get(f"{x[0]}|{brand}", [])), -(x[1].get("ratio") or 0)))
+
+    def rank(x):
+        vid, c = x
+        pin = pinned.index(vid) if vid in pinned else len(pinned)
+        return (-len(log.get(f"{vid}|{brand}", [])), pin, -(c.get("ratio") or 0))
+
+    usable.sort(key=rank)
     return usable[0]
 
 
@@ -160,8 +181,10 @@ def apply(plans: list[ContentPlan], *, client=None, sleep=time.sleep) -> list[st
     log = _read(log_path, {})
     lines: list[str] = []
     taken: set[str] = set()  # 同じ日に同じ型を2ブランドで使わない（型の検証を分散）
+    cfg = _mimic_cfg()
     for p in plans:
-        picked = pick_card(cards, log, p.brand.value, taken)
+        picked = pick_card(cards, log, p.brand.value, taken,
+                           pinned=cfg.get("pinned"), retired=cfg.get("retired"))
         if picked is None:
             lines.append(f"{p.plan_id}: 使える型が残っていないため通常企画のまま")
             continue
