@@ -11,6 +11,12 @@ on:
         required: false
         type: string
         default: ""
+      commit_paths:
+        # 実行後に main へコミットするファイル（空なら何もしない）。呼び出し側に
+        # permissions: contents: write が必要。
+        required: false
+        type: string
+        default: ""
 
 jobs:
   run:
@@ -88,6 +94,24 @@ jobs:
           GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
           ALERT_EMAIL_TO: ${{ secrets.ALERT_EMAIL_TO }}
         run: python -m src.cli ${{ inputs.command }} ${{ inputs.extra_args }}
+
+      - name: 生成物をコミット
+        if: inputs.commit_paths != ''
+        run: |
+          if [ -z "$(git status --porcelain -- ${{ inputs.commit_paths }})" ]; then
+            echo "変更なし、コミットしない"; exit 0
+          fi
+          git config user.name "sns-bot[bot]"
+          git config user.email "sns-bot@users.noreply.github.com"
+          git add -- ${{ inputs.commit_paths }}
+          git commit -q -m "${{ inputs.command }}: ${{ inputs.commit_paths }} を自動更新"
+          # main が先に進んでいたら rebase して再試行。push できなくても失敗にしない（翌日反映）
+          for i in 1 2 3; do
+            if git push -q origin HEAD:main; then echo "pushed"; exit 0; fi
+            git fetch -q origin main && git rebase -q origin/main
+            sleep 5
+          done
+          echo "::warning::${{ inputs.commit_paths }} を push できなかった（翌日の実行で反映される）"
 
       - name: 状態の指紋（実行後）
         id: after

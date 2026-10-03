@@ -101,8 +101,13 @@ def _gcs_bucket_mb() -> float | None:
         return None
 
 
-def _prepaid(purchases: list[dict], unit: str, usage: list[tuple[str, float]], today: date) -> dict:
-    """前払いの残り見込み。usage は (日付, 円 or ドル)。"""
+def _prepaid(purchases: list[dict], unit: str, usage: list[tuple[str, float]], today: date,
+             *, planned_per_day: float = 0.0) -> dict:
+    """前払いの残り見込み。usage は (日付, 円 or ドル)。
+
+    1日あたりは「直近7日の実績」と「予定ペース（planned_per_day）」の多い方。買った直後は
+    実績が少なく、実績だけだと残り日数を長く見積もりすぎるため（安全側に倒す）。
+    """
     if not purchases:
         return {}
     start = min(p["date"] for p in purchases)
@@ -111,7 +116,7 @@ def _prepaid(purchases: list[dict], unit: str, usage: list[tuple[str, float]], t
     week_ago = (today - timedelta(days=7)).isoformat()
     recent = [v for d, v in usage if d > week_ago and d >= start]
     days_in_window = min(7, (today - date.fromisoformat(start)).days + 1)
-    per_day = sum(recent) / days_in_window if recent else 0.0
+    per_day = max(sum(recent) / days_in_window if recent else 0.0, planned_per_day)
     remaining = bought - used
     days_left = remaining / per_day if per_day > 0 else None
     return {"unit": unit, "bought": bought, "used": round(used, 2),
@@ -150,8 +155,12 @@ def run_check(*, state: Path = STATE_DIR, now: datetime | None = None,
                         "claude_jpy": round(sum(claude_today))}
 
     usd_jpy = acc["usd_jpy"]
+    veo_cfg = cfg_mod.load("generation").get("veo", {}) or {}
+    slots = int(cfg_mod.load("scoring")["allocation"].get("total_daily_slots", 0))
+    veo_planned = float(veo_cfg.get("price_jpy_per_sec", 0)) * max(veo_cfg.get("allowed_durations") or [8]) * slots
     res.prepaid = {
-        "veo": _prepaid(acc["prepaid"]["veo"]["purchases"], "jpy", veo_usage, today),
+        "veo": _prepaid(acc["prepaid"]["veo"]["purchases"], "jpy", veo_usage, today,
+                        planned_per_day=veo_planned),
         "anthropic": _prepaid(acc["prepaid"]["anthropic"]["purchases"], "usd",
                               [(d, v / usd_jpy) for d, v in llm_usage], today),
     }

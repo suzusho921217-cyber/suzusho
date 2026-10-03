@@ -84,3 +84,27 @@ def test_record_llm_usage_appends(tmp_path, monkeypatch):
     rows = json.loads(next(tmp_path.glob("llm_usage-*.json")).read_text())
     assert [r["web_search"] for r in rows] == [2, 0]
     assert rows[0]["input"] == 100 and rows[0]["cache_read"] == 0
+
+
+def test_progress_page_renders(tmp_path):
+    from types import SimpleNamespace
+
+    from src.accounting import progress
+    from src.common.models import Brand, Platform, PostStatus
+
+    res = run_check(state=_state(tmp_path), now=NOW, gcs_bucket_mb=lambda: 1.6)
+    post = SimpleNamespace(status=PostStatus.PUBLISHED, platform_post_id="v", post_key="k",
+                           brand=Brand.CAT, platform=Platform.YOUTUBE,
+                           published_at=datetime(2026, 10, 3, 12, 0, tzinfo=JST))
+    store = SimpleNamespace(
+        list_account_daily=lambda: [SimpleNamespace(date="2026-10-03", brand=Brand.CAT,
+                                                    platform=Platform.YOUTUBE, followers=25)],
+        list_posts=lambda: [post],
+        list_snapshots=lambda post_key: [SimpleNamespace(snapshot="latest", views=1028)],
+        list_decisions=lambda: [],
+    )
+    md = progress.build(store, res)
+    assert "| YouTube 猫 | 25 |" in md
+    assert "| YouTube 猫 | 1 | 2026-10-03 | 1,028 |" in md
+    # 予定ペース(2本×¥88)で見積もる: 残り ¥4,824 ÷ ¥176 ≒ 27日 → 10/30
+    assert "2026-10-30: Veo（動画生成） の前払いが尽きる見込み" in md

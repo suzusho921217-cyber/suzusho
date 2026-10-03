@@ -1158,7 +1158,15 @@ def cmd_accounting(args: argparse.Namespace) -> int:
     異常時の【要確認】だけメールする（`src/accounting/check.py`）。"""
     from src.accounting.check import run_and_notify
 
-    run_and_notify()
+    res = run_and_notify()
+    # 1枚で状況がわかる progress.md も書き換える（ワークフローがコミットする）
+    try:
+        from src.accounting import progress
+        from src.sheets.client import get_store
+
+        print(f"[accounting] wrote {progress.write(get_store(), res)}")
+    except Exception as e:  # noqa: BLE001 - 進捗ページの失敗で経理チェックを失敗扱いにしない
+        print(f"[accounting] progress.md の更新に失敗: {e}")
     return 0
 
 
