@@ -101,7 +101,7 @@ def test_progress_page_renders(tmp_path):
                                                     platform=Platform.YOUTUBE, followers=25)],
         list_posts=lambda: [post],
         list_snapshots=lambda post_key: [SimpleNamespace(snapshot="latest", views=1028)],
-        list_decisions=lambda: [],
+        list_decisions=list,
     )
     md = progress.build(store, res)
     assert "| YouTube 猫 | 25 |" in md
