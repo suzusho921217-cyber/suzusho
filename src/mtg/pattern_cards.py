@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import json
 import re
+import time
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -22,6 +23,9 @@ from src.common.config import env
 STATE = Path(__file__).resolve().parents[2] / ".state" / "pattern_cards.json"
 JST = timezone(timedelta(hours=9))
 _MODEL_DEFAULT = "gemini-3.6-flash"
+# 混雑(503)・レート制限(429)のときに順に試す無料枠モデル。どれも無料枠キーでのみ呼ぶ。
+_FALLBACK_MODELS = ("gemini-3.8-flash", "gemini-3.5-flash-lite")
+_RETRY_WAIT_SEC = 15
 _MAX_NEW = 5          # 1日に新しく分析する本数の上限（無料枠のレート制限にも余裕を持たせる）
 _REPORT_N = 10        # 会議に渡すカード数（新しく伸びた順）
 
@@ -89,9 +93,31 @@ def analyze_video(client, url: str, *, model: str) -> dict | None:
     return _parse(resp.text)
 
 
+def _is_busy(e: Exception) -> bool:
+    text = str(e)
+    return any(k in text for k in ("503", "UNAVAILABLE", "429", "RESOURCE_EXHAUSTED", "high demand"))
+
+
+def _analyze_with_fallback(client, url: str, models, *, sleep=time.sleep) -> dict | None:
+    """混雑・レート制限なら同じモデルで1回待って再試行し、だめなら次の無料モデルへ。"""
+    last: Exception | None = None
+    for model in models:
+        for attempt in range(2):
+            try:
+                return analyze_video(client, url, model=model)
+            except Exception as e:
+                if not _is_busy(e):
+                    raise
+                last = e
+                if attempt == 0:
+                    sleep(_RETRY_WAIT_SEC)
+    raise last  # type: ignore[misc]
+
+
 def update_cards(outliers: list[dict], *, client=None, now: datetime | None = None,
-                 max_new: int = _MAX_NEW) -> tuple[dict, list[str]]:
+                 max_new: int = _MAX_NEW, sleep=None) -> tuple[dict, list[str]]:
     """未分析の異常値動画をカード化して貯める。(全カード, ログ) を返す。"""
+    sleep = sleep or time.sleep
     cards = _load()
     log: list[str] = []
     todo = [o for o in outliers if _video_id(o["url"]) not in cards][:max_new]
@@ -105,11 +131,11 @@ def update_cards(outliers: list[dict], *, client=None, now: datetime | None = No
         from google import genai
 
         client = genai.Client(api_key=key)
-    model = env("GEMINI_ANALYSIS_MODEL", _MODEL_DEFAULT)
+    models = (env("GEMINI_ANALYSIS_MODEL", _MODEL_DEFAULT), *_FALLBACK_MODELS)
     now = now or datetime.now(JST)
     for o in todo:
         try:
-            card = analyze_video(client, o["url"], model=model)
+            card = _analyze_with_fallback(client, o["url"], models, sleep=sleep)
         except Exception as e:  # noqa: BLE001 - 1本の失敗で残りと会議を止めない
             log.append(f"分析失敗 {o['url']}: {type(e).__name__}: {str(e)[:120]}")
             continue

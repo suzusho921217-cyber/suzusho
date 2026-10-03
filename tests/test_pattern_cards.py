@@ -53,6 +53,24 @@ def test_no_key_means_no_analysis(tmp_path, monkeypatch):
 
 def test_one_failure_does_not_stop_others(tmp_path, monkeypatch):
     monkeypatch.setattr(pc, "STATE", tmp_path / "pattern_cards.json")
-    cards, log = pc.update_cards(OUT, client=_Client(fail=("AAAAAAAA",)))
+    cards, log = pc.update_cards(OUT, client=_Client(fail=("AAAAAAAA",)), sleep=lambda s: None)
     assert set(cards) == {"BBBBBBBB"}
     assert any("分析失敗" in x for x in log)
+
+
+def test_busy_model_retries_then_falls_back(tmp_path, monkeypatch):
+    monkeypatch.setattr(pc, "STATE", tmp_path / "pattern_cards.json")
+    c = _Client()
+    tried = []
+    real = c._gen
+
+    def gen(*, model, contents, config):
+        tried.append(model)
+        if model == "gemini-3.6-flash":
+            raise RuntimeError("503 UNAVAILABLE high demand")
+        return real(model=model, contents=contents, config=config)
+
+    c.models.generate_content = gen
+    cards, _ = pc.update_cards(OUT[:1], client=c, sleep=lambda s: None)
+    assert "AAAAAAAA" in cards
+    assert tried == ["gemini-3.6-flash", "gemini-3.6-flash", "gemini-3.8-flash"]
