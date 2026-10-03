@@ -173,6 +173,20 @@ def gather_outlier_report() -> str:
         items = collect_outliers(key, tag_sink=tags)
         _save(items)
         _save_json("trending_tags.json", tags)
-        return format_report(items)
+        report = format_report(items)
     except Exception as e:  # noqa: BLE001 - 外部API障害でMTG全体を止めない
         return f"（異常値動画の取得に失敗: {type(e).__name__}: {e}）"
+
+    # 動画の中身を実際に見た「型カード」（無料枠キーがある時だけ新規分析。過去のカードは常に渡す）
+    try:
+        from .pattern_cards import format_cards, update_cards
+
+        cards, log = update_cards(items)
+        return (
+            report
+            + "\n\n## 型カード（Gemini が動画を実際に見て分析したもの。真似る型はここから選ぶ）\n"
+            + ("\n".join(f"- {x}" for x in log) + "\n" if log else "")
+            + format_cards(cards)
+        )
+    except Exception as e:  # noqa: BLE001
+        return report + f"\n\n（型カードの作成に失敗: {type(e).__name__}: {e}）"

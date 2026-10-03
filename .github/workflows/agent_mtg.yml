@@ -52,6 +52,8 @@ jobs:
       - name: agent-mtg
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          # 競合動画を実際に見て型カードにする（無料枠専用キー。Veo の有料キーとは別）
+          GEMINI_ANALYSIS_API_KEY: ${{ secrets.GEMINI_ANALYSIS_API_KEY }}
           YOUTUBE_API_KEY: ${{ secrets.YOUTUBE_API_KEY }}
           YOUTUBE_OAUTH_CLIENT_ID: ${{ secrets.YOUTUBE_OAUTH_CLIENT_ID }}
           YOUTUBE_OAUTH_CLIENT_SECRET: ${{ secrets.YOUTUBE_OAUTH_CLIENT_SECRET }}

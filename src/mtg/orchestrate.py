@@ -103,8 +103,10 @@ def run() -> MtgResult:
     researcher_out = call_role(roles.RESEARCHER_SYSTEM, researcher_input, with_web_search=True)
     result.transcripts["researcher"] = researcher_out
 
+    # 企画役にも型カードの原文を渡す（調査役の要約だけだと、真似る型の細部が落ちる）
     marketer_input = (
         f"{context}\n\n## analystの分析\n{analyst_out}\n\n## researcherの調査\n{researcher_out}"
+        f"\n\n## 異常値PV動画と型カード（原文）\n{outlier_report}"
     )
     marketer_out = call_role(roles.MARKETER_SYSTEM, marketer_input)
     result.transcripts["marketer"] = marketer_out
