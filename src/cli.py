@@ -517,9 +517,16 @@ def cmd_media(args: argparse.Namespace) -> int:
         d.mkdir(parents=True, exist_ok=True)
         try:
             master = normalize_master(src, str(d / "master.mp4"))
+            # テロップ: 完成動画を無料枠 Gemini に見せて作る（キー無し・失敗ならテロップ無し）
+            from src.media.captions import for_plan as captions_for_plan
+
+            caps = captions_for_plan(date, plan.plan_id, master, concept=plan.concept_tag,
+                                     hook=plan.hook_type, duration=plan.duration_target_sec)
+            if caps:
+                print(f"  {plan.plan_id} テロップ: " + " / ".join(c["text"] for c in caps))
             for platform in plan.target_platforms:
                 spec = MediaVariantSpec(platform=platform,
-                                        duration_sec=plan.duration_target_sec)
+                                        duration_sec=plan.duration_target_sec, captions=caps)
                 out = make_variant(master, spec, str(d / f"{platform.value}.mp4"))
                 variants[f"{plan.plan_id}|{platform.value}"] = out
                 made += 1

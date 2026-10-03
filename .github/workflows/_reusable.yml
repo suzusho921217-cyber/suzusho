@@ -53,7 +53,8 @@ jobs:
         # リポジトリ（Google Chrome 等）が一時的に壊れているだけで install まで
         # 巻き込まれて失敗する(2026-09-09 実際に発生・自然復旧待ちで数十分ロスした)。
         # ffmpeg は Ubuntu 標準リポジトリにあるので、update 失敗は無視して進める。
-        run: sudo apt-get update || true; sudo apt-get install -y ffmpeg
+        # fonts-noto-cjk はテロップ焼き込み用の日本語フォント（media）
+        run: sudo apt-get update || true; sudo apt-get install -y ffmpeg fonts-noto-cjk
 
       - name: run
         env:

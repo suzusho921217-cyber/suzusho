@@ -95,7 +95,10 @@ def analyze_video(client, url: str, *, model: str) -> dict | None:
 
 def _is_busy(e: Exception) -> bool:
     text = str(e)
-    return any(k in text for k in ("503", "UNAVAILABLE", "429", "RESOURCE_EXHAUSTED", "high demand"))
+    return any(k in text for k in ("503", "UNAVAILABLE", "429", "RESOURCE_EXHAUSTED", "high demand",
+                                   "500", "INTERNAL", "disconnected", "RemoteProtocolError",
+                                   "timed out", "Timeout", "Connection reset")) or type(e).__name__ in (
+        "RemoteProtocolError", "ReadTimeout", "ConnectError", "ConnectTimeout")
 
 
 def _analyze_with_fallback(client, url: str, models, *, sleep=time.sleep) -> dict | None:
