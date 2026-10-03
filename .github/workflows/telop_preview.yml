@@ -1,0 +1,32 @@
+# テロップの試し焼き（手動・投稿しない）。直近の生成動画にテロップを付けて静止画を artifact に出す。
+# 状態は読むだけ（キャッシュは保存しない）。
+name: telop_preview
+on:
+  workflow_dispatch:
+
+jobs:
+  preview:
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/cache/restore@v4
+        with:
+          path: .state
+          key: sns-state-preview-${{ github.run_id }}
+          restore-keys: sns-state-
+          fail-on-cache-miss: true
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -r requirements.txt
+      - run: sudo apt-get update || true; sudo apt-get install -y ffmpeg fonts-noto-cjk
+      - name: preview
+        env:
+          GEMINI_ANALYSIS_API_KEY: ${{ secrets.GEMINI_ANALYSIS_API_KEY }}
+        run: python -m src.media.preview
+      - uses: actions/upload-artifact@v4
+        with:
+          name: telop-preview-${{ github.run_id }}
+          path: preview/*.png
