@@ -173,9 +173,9 @@ def apply(plans: list[ContentPlan], *, client=None, sleep=time.sleep) -> list[st
         key = env("GEMINI_ANALYSIS_API_KEY")
         if not key:
             return ["GEMINI_ANALYSIS_API_KEY 未設定のため通常企画のまま（有料キーは使わない）"]
-        from google import genai
+        from src.mtg.pattern_cards import free_client
 
-        client = genai.Client(api_key=key)
+        client = free_client(key)
 
     log_path = STATE_DIR / "mimic_log.json"
     log = _read(log_path, {})

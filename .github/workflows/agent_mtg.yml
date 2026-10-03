@@ -18,6 +18,7 @@ concurrency:
 jobs:
   run:
     runs-on: ubuntu-latest
+    timeout-minutes: 40   # 応答しない外部APIで後続を詰まらせない
     environment: production
     steps:
       - uses: actions/checkout@v4

@@ -51,6 +51,18 @@ _PROMPT = """\
 """
 
 
+_TIMEOUT_MS = 120_000   # 1回の問い合わせの待ち時間の上限。無いと応答が返らず止まり続ける（2026-10-03 実際に25分停止）
+_BUDGET_SEC = 8 * 60    # 1回の実行で型カード作りに使う時間の上限（パイプラインの順番待ちを詰まらせない）
+
+
+def free_client(key: str):
+    """無料枠専用キーの Gemini クライアント（待ち時間の上限つき）。"""
+    from google import genai
+    from google.genai import types
+
+    return genai.Client(api_key=key, http_options=types.HttpOptions(timeout=_TIMEOUT_MS))
+
+
 def _load() -> dict:
     try:
         return json.loads(STATE.read_text(encoding="utf-8"))
@@ -131,12 +143,14 @@ def update_cards(outliers: list[dict], *, client=None, now: datetime | None = No
         if not key:
             log.append("GEMINI_ANALYSIS_API_KEY 未設定のため動画の中身は未分析（無料枠キー専用。有料キーは使わない）")
             return cards, log
-        from google import genai
-
-        client = genai.Client(api_key=key)
+        client = free_client(key)
     models = (env("GEMINI_ANALYSIS_MODEL", _MODEL_DEFAULT), *_FALLBACK_MODELS)
     now = now or datetime.now(JST)
+    started = time.monotonic()
     for o in todo:
+        if time.monotonic() - started > _BUDGET_SEC:
+            log.append("時間の上限に達したため残りは次回に回す")
+            break
         try:
             card = _analyze_with_fallback(client, o["url"], models, sleep=sleep)
         except Exception as e:  # noqa: BLE001 - 1本の失敗で残りと会議を止めない

@@ -84,9 +84,9 @@ def suggest(video_path: str, *, concept: str, hook: str, duration: float, client
         if not key:
             print("[captions] GEMINI_ANALYSIS_API_KEY 未設定のためテロップ無し（有料キーは使わない）")
             return None
-        from google import genai
+        from src.mtg.pattern_cards import free_client
 
-        client = genai.Client(api_key=key)
+        client = free_client(key)
     from google.genai import types
 
     from src.mtg.pattern_cards import _FALLBACK_MODELS, _MODEL_DEFAULT, _is_busy

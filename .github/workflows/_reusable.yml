@@ -21,6 +21,8 @@ on:
 jobs:
   run:
     runs-on: ubuntu-latest
+    # 1回の実行の上限。外部APIが応答しないまま止まると、同じ順番待ちの後続（投稿など）が詰まるため
+    timeout-minutes: 30
     environment: production        # Secrets は Environment 側で管理（§5）
     steps:
       - uses: actions/checkout@v4
