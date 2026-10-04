@@ -1,18 +1,19 @@
 # 競合調査の範囲（src/mtg/outliers.py）。会議の統括が auto_apply で増減できる（費用なし）。
 # YouTube Data API の無料枠（1日1万ユニット）: 検索1回=100、チャンネルの新着取得=数ユニット。
 queries:            # 異常値動画を探す検索ワード（最大20）
-  - 猫 ショート
-  - 犬 ショート
-  - 猫 かわいい 面白い
-  - 犬 かわいい 面白い
-  - cat shorts funny
-  - dog shorts cute
-  - AI cat
-  - AI dog
-  - 猫 人間みたい
-  - AI 猫 物語
-  - what if cats were humans
-  - dog pov shorts
+- 猫 ショート
+- 犬 ショート
+- 猫 かわいい 面白い
+- 犬 かわいい 面白い
+- cat shorts funny
+- dog shorts cute
+- AI cat
+- AI dog
+- 猫 人間みたい
+- AI 猫 物語
+- what if cats were humans
+- dog pov shorts
+- Afrehmation人間化猫ドアップ型の他模倣者・類似成功事例
 watch_channels:     # 定点観測するベンチマークチャンネル（@ハンドル or UC…ID、最大20）。新着から異常値を拾う
-  - "@Afrehmation"
-  - "@NightVeil"
+- "@Afrehmation"
+- "@NightVeil"

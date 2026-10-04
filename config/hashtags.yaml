@@ -30,16 +30,11 @@ cat:
   instagram:
     always: ["#猫", "#cat", "#catstagram", "#catsofinstagram"]
     pool:
-    - '#ai'
-    - '#cute'
     - '#cat'
-    - '#foryou'
+    - '#aiart'
     - '#shorts'
-    - '#fyp'
-    - '#catsoftiktok'
-    - '#catvideos'
     - '#funny'
-    - '#adorable'
+    - '#cutecats'
     per_video: 6
   x:
     always: ["#猫", "#cat"]
