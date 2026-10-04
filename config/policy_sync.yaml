@@ -7,12 +7,9 @@
 # 非0で終了する（GitHub Actions のジョブ失敗 = 失敗通知メール）。
 
 feeds:
-  - platform: youtube
-    name: data-api-revision-history
-    url: https://developers.google.com/static/youtube/v3/feeds/data-api-revision-history.xml
-  - platform: youtube
-    name: analytics-api-revision-history
-    url: https://developers.google.com/static/youtube/analytics/feeds/analytics-api-revision-history.xml
+  # YouTube Data API / Analytics API の revision history フィードは Google 側で廃止
+  # （2026-10-04 確認: data は 404、analytics は HTML ページが返る）。毎日ジョブ失敗に
+  # なるだけなので外し、下の manual_review_urls の revision_history ページで人手確認する。
   - platform: x
     name: api-changelog
     url: https://docs.x.com/changelog/rss.xml
@@ -22,6 +19,8 @@ feeds:
 # フィードが無く目視確認が必要なページ（policy_sync は取得しない。運用チェックリスト用）。
 manual_review_urls:
   youtube:
+    - https://developers.google.com/youtube/v3/revision_history          # Data API 変更履歴
+    - https://developers.google.com/youtube/analytics/revision_history   # Analytics API 変更履歴
     - https://support.google.com/youtube/answer/2802002    # ヌード・性的コンテンツ
     - https://support.google.com/youtube/answer/14328491   # AI生成物の開示
     - https://support.google.com/youtube/answer/1311392    # 収益化（inauthentic content）

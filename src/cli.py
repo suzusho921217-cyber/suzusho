@@ -128,6 +128,11 @@ def _load_winning_tags(path: str | None) -> list[dict]:
 
 def cmd_plan_daily(args: argparse.Namespace) -> int:
     target_date = args.date or datetime.now(JST).date().isoformat()
+    if getattr(args, "if_missing", False):
+        existing = Path(args.out) if args.out else STATE_DIR / f"plan-{target_date}.json"
+        if existing.exists():
+            print(f"[plan-daily] {existing.name} は作成済み → 予備実行はスキップ")
+            return 0
 
     allocation_cfg = load("scoring")["allocation"]
     planning_cfg = load("planning")
@@ -1114,13 +1119,14 @@ def cmd_kill_switch(args: argparse.Namespace) -> int:
     # kill-switch は毎時動くので、そのついでに「今日のプランがあるか」を見張る。
     now = datetime.now(JST)
     plan_path = STATE_DIR / f"plan-{now.date().isoformat()}.json"
-    if now.hour >= 7 and not plan_path.exists():
+    if now.hour >= 10 and not plan_path.exists():
         print(f"[kill-switch] ! {plan_path.name} が無い（plan_daily 未実行の可能性）")
         send_alert_email(
             "[AI動画自動投稿] 今日のプランが無い",
             f"{plan_path.name} が存在しません。plan_daily が今日まだ実行できていない"
-            "可能性があります（GitHub Actions の concurrency キューで"
-            "他のワークフローに割り込まれてキャンセルされた等）。\n\n"
+            "可能性があります（GitHub Actions の定時実行が数時間遅れている、"
+            "concurrency キューで割り込まれてキャンセルされた等）。\n"
+            "08:00 / 09:30 JST の予備実行でも作られていない状態です。\n\n"
             "Actions → plan_daily → Run workflow で手動実行してください"
             "（続けて generate も手動実行が必要です）。",
         )
@@ -1201,6 +1207,11 @@ def main(argv: list[str] | None = None) -> int:
             p.add_argument("--date", help="YYYY-MM-DD (default: today)")
             p.add_argument("--winning-tags", help="learning 出力の JSON パス (default: .state/winning_tags.json)")
             p.add_argument("--out", help="出力先 JSON (default: .state/plan-<date>.json)")
+            p.add_argument(
+                "--if-missing",
+                action="store_true",
+                help="当日のプランが既にあれば何もしない（予備の定時実行用）",
+            )
         if name == "daily-learning":
             p.add_argument("--input", help="成績 JSON パス (default: .state/performance.json)")
             p.add_argument("--out", help="出力先 JSON (default: .state/winning_tags.json)")

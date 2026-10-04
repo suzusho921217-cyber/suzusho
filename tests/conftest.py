@@ -42,3 +42,11 @@ def _isolate_from_local_env(monkeypatch):
     _config._load_dotenv()
     for key in _LOCAL_ONLY_ENV_KEYS:
         monkeypatch.delenv(key, raising=False)
+
+
+@pytest.fixture(autouse=True)
+def _no_sheets_write_pacing(monkeypatch):
+    """本番の Sheets 書き込み間隔（1分60回の上限対策）はテストでは待たない。"""
+    from src.sheets import client as _sheets_client
+
+    monkeypatch.setattr(_sheets_client, "_WRITE_MIN_INTERVAL_SEC", 0.0)

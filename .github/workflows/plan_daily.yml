@@ -3,6 +3,12 @@ name: plan_daily
 on:
   schedule:
     - cron: "30 21 * * *"  # 06:30 JST（policy_sync の後）
+    # 予備: GitHub の定時実行は数時間遅れたり飛んだりする(2026-10-04 は 06:30 分が 11:48 まで遅延)。
+    # 定時実行はすべて「当日プランがまだ無いときだけ作る」（--if-missing）。遅れて届いた本番分が
+    # 予備で作ったプランを上書きすると、生成済みの企画と食い違い二重生成（課金）になるため。
+    # 手動実行（workflow_dispatch）は従来どおり作り直す。generate 10:00 JST に間に合わせる
+    - cron: "0 23 * * *"   # 08:00 JST
+    - cron: "30 0 * * *"   # 09:30 JST
   workflow_dispatch:
 
 concurrency:
@@ -14,4 +20,5 @@ jobs:
     uses: ./.github/workflows/_reusable.yml
     with:
       command: plan-daily
+      extra_args: ${{ github.event_name == 'schedule' && '--if-missing' || '' }}
     secrets: inherit

@@ -465,13 +465,27 @@ def _parse_dt_ja(display_str: str) -> str:
         return display_str
 
 
-_MAX_ATTEMPTS = 3
+# 429 の待ちは 30→60→90→120秒。3回(計90秒)では窓をまたいでも弾かれ続けて落ちた(2026-10-04)
+_MAX_ATTEMPTS = 5
 _RETRY_BACKOFF_SEC = 5.0
 _RATE_LIMIT_BACKOFF_SEC = 30.0
 _RETRYABLE_STATUS = {429, 500, 502, 503, 504}
 
 
 _TRANSIENT_NETWORK_ERRORS = (TimeoutError, ConnectionError, ssl.SSLError)
+
+# 書き込み上限は「1分あたり60回/ユーザー」。投稿数が増えて metrics が1分に60行以上を
+# 書くようになり 429 で落ちた(2026-10-04)。書き込みの間隔を空けて上限の手前に抑える。
+_WRITE_MIN_INTERVAL_SEC = 1.1
+_last_write_at = 0.0
+
+
+def _pace_write(*, sleep=time.sleep, now=time.monotonic) -> None:
+    global _last_write_at
+    wait = _WRITE_MIN_INTERVAL_SEC - (now() - _last_write_at)
+    if wait > 0:
+        sleep(wait)
+    _last_write_at = now()
 
 
 def _execute_with_retry(request, *, sleep=time.sleep):
@@ -694,12 +708,14 @@ class SheetsStore(Store):
             # range は見出し行から下に絞る（見出しより上に集計欄等があっても、
             # そちらを「表」として誤検出して追記されないようにするため）。
             append_range = f"{tab}!A{header_idx}:Z" if header_idx else tab
+            _pace_write()
             res = _execute_with_retry(svc.append(
                 spreadsheetId=self.spreadsheet_id, range=append_range,
                 valueInputOption="RAW", insertDataOption="OVERWRITE",
                 body={"values": [values]},
             ))
         else:
+            _pace_write()
             _execute_with_retry(svc.update(
                 spreadsheetId=self.spreadsheet_id, range=f"{tab}!A{match_row_number}",
                 valueInputOption="RAW", body={"values": [values]},

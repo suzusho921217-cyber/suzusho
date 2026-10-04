@@ -42,7 +42,7 @@ def test_execute_with_retry_succeeds_after_transient_errors():
 
 
 def test_execute_with_retry_gives_up_after_max_attempts():
-    req = _Request([503, 503, 503])
+    req = _Request([503] * client._MAX_ATTEMPTS)
 
     with pytest.raises(HttpError):
         client._execute_with_retry(req, sleep=lambda _: None)
@@ -93,3 +93,13 @@ def test_execute_with_retry_gives_up_after_max_attempts_on_timeout():
         client._execute_with_retry(req, sleep=lambda _: None)
 
     assert req.calls == client._MAX_ATTEMPTS
+
+
+def test_pace_write_keeps_interval_between_writes(monkeypatch):
+    monkeypatch.setattr(client, "_WRITE_MIN_INTERVAL_SEC", 1.1)
+    monkeypatch.setattr(client, "_last_write_at", 100.0)
+    sleeps: list[float] = []
+
+    client._pace_write(sleep=sleeps.append, now=lambda: 100.5)
+
+    assert sleeps == [pytest.approx(0.6)]
