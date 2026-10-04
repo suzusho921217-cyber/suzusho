@@ -4,8 +4,8 @@ allocation:
   total_daily_slots: 2              # 1日2本（日次予算¥200のまま3本目が95%ガードで
                                     # 毎日のように落ちていたため。2026-09-10 3→2）
                                     # Veo 720p 8秒 ¥64/本 × 2 = ¥128/日。媒体数は複数に展開する。
-  exploit_ratio: 0.5               # 既存勝ちパターン
-  explore_ratio: 0.5               # 新企画・新フック・新尺
+  exploit_ratio: 0.35              # 既存勝ちパターン
+  explore_ratio: 0.65              # 新企画・新フック・新尺
   brand_max_ratio: 0.60           # 1ブランド配分上限
   brand_min_explore_posts: 1      # 各ブランド最低探索を一定周期で確保
   eval_windows_days: [7, 30]      # 直近7日＋30日を併用
