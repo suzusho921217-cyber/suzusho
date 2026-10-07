@@ -14,11 +14,9 @@ cat:
     pool:
     - '#Shorts'
     - '#猫'
-    - '#ai'
-    - '#立場逆転'
-    - '#擬人化'
-    - '#cute'
-    - '#foryou'
+    - '#cat'
+    - '#二段オチ'
+    - '#AI'
     per_video: 4
   tiktok:
     always: ["#猫", "#cat", "#catsoftiktok", "#fyp"]
