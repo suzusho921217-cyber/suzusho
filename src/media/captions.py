@@ -21,6 +21,8 @@ STATE_DIR = Path(__file__).resolve().parents[2] / ".state"
 MAX_LINES = 3
 MAX_CHARS = 20          # 1枚のテロップの最大文字数（長いと読み切れない）
 MAX_LINE = 11           # 1行の最大文字数（画面幅に収まる長さ）
+# 2026-10-10 ユーザー判断「字幕いらない」で停止。False の間は Gemini も呼ばずテロップ無しで書き出す。
+ENABLED = False
 
 _PROMPT = """\
 あなたはペット系ショート動画の編集者です。この{duration}秒の動画を見て、画面に焼き込むテロップを
@@ -134,6 +136,8 @@ def suggest(video_path: str, *, concept: str, hook: str, duration: float, client
 def for_plan(date: str, plan_id: str, video_path: str, *, concept: str, hook: str,
              duration: float) -> list[dict]:
     """キャッシュがあればそれを返し、無ければ作って保存する。"""
+    if not ENABLED:
+        return []
     path = STATE_DIR / f"captions-{date}.json"
     try:
         cache = json.loads(path.read_text(encoding="utf-8"))

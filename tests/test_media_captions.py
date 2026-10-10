@@ -60,7 +60,14 @@ def test_suggest_with_fake_client_deletes_upload():
     assert deleted == ["f1"]
 
 
+def test_for_plan_disabled_returns_nothing(monkeypatch):
+    monkeypatch.setattr(cap, "ENABLED", False)
+    monkeypatch.setattr(cap, "suggest", lambda *a, **k: 1 / 0)  # 呼ばれない
+    assert cap.for_plan("2026-10-04", "p1", "v.mp4", concept="c", hook="h", duration=8) == []
+
+
 def test_for_plan_caches_success_but_not_failure(tmp_path, monkeypatch):
+    monkeypatch.setattr(cap, "ENABLED", True)
     monkeypatch.setattr(cap, "STATE_DIR", tmp_path)
     monkeypatch.setattr(cap, "suggest", lambda *a, **k: None)  # 失敗
     assert cap.for_plan("2026-10-04", "p1", "v.mp4", concept="c", hook="h", duration=8) == []
