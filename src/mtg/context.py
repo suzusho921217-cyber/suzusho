@@ -194,6 +194,22 @@ _FACT_CORRECTIONS = """\
 """
 
 
+ROADMAP_PATH = Path(__file__).resolve().parents[2] / "docs" / "monetization_roadmap.md"
+
+
+def _weekly_strategy_note(limit: int = 4000) -> str:
+    """経営企画（週1）の最新の週次所見。0円の提案は「統括への申し送り」としてここに載る。"""
+    head = "## 経営企画の週次所見（最新。「統括への申し送り」は統括が採否を決める）\n"
+    try:
+        text = ROADMAP_PATH.read_text(encoding="utf-8")
+    except OSError:
+        return head + "取得できなかった"
+    i = text.find("## 週次所見")
+    if i < 0:
+        return head + "まだ無い"
+    return head + text[i:i + limit]
+
+
 def gather_context() -> str:
     """全役職共通の状況説明テキスト（configの現状 + 直近の実績）。"""
     parts: list[str] = [
@@ -240,6 +256,8 @@ def gather_context() -> str:
     parts.append("## 生成費の消化状況（今月）\n" + _spend_summary(budget))
 
     parts.append("## 意思決定ログ（過去14日 + 未評価の判断）\n" + _decision_log_summary(store))
+
+    parts.append(_weekly_strategy_note())
 
     return "\n\n".join(parts)
 
