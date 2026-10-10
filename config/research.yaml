@@ -19,6 +19,7 @@ queries:            # 異常値動画を探す検索ワード（最大20）
 - Dhdj Dhs 頭トラブル隠蔽 コント 構成 秒数
 - YouTube Shorts ランキング形式 動物 TOP5 面白い トレンド
 - exploit配分アルゴリズム 勝ちタグスコア昇格条件 0本継続の原因
+- YouTube Shorts ランキング形式 動物 4位 3位 再生数 2026
 watch_channels:     # 定点観測するベンチマークチャンネル（@ハンドル or UC…ID、最大20）。新着から異常値を拾う
 - "@Afrehmation"
 - "@NightVeil"
