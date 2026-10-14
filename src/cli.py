@@ -882,9 +882,10 @@ def cmd_metrics(args: argparse.Namespace) -> int:
         followers_before = _followers_before(post)
         latest_views = None
         for label in due:
-            if label != "latest" and needs_backfill(post, label, now):
+            if needs_backfill(post, label, now):
                 # 窓を過ぎてから取り直す空行: 現在値を入れると「その時点」より大きくなるので、
                 # 公開〜その時点の期間指定で復元する。対応していない媒体は空欄のまま。
+                # latest は 30 日で更新を止めた後の空行（30 日時点で復元）。
                 window_raw = publisher.fetch_metrics_window(
                     post.platform_post_id, post.published_at, window_end(post, label),
                 )

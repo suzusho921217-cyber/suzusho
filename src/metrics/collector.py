@@ -33,6 +33,10 @@ _LATEST_UNTIL = timedelta(days=30)   # これ以降は latest も更新しない
 #     （YouTube Analytics は数日遅れで確定するので、確定を待ってから）
 _RETRY_GRACE = timedelta(days=1)
 _BACKFILL_AFTER = timedelta(days=3)
+# latest が空のまま 30 日を迎えた行（2026-10-11〜14 の YouTube トークン失効中に
+# 30 日目が来た 9/11〜9/14 投稿）は、以降更新されず空欄のまま固定されていた。
+# 空なら 30 日時点の値を期間指定で復元する。この期限を過ぎたらあきらめる。
+_LATEST_BACKFILL_UNTIL = timedelta(days=60)
 
 # 生の API キー -> PerformanceSnapshot のフィールド（媒体差を吸収）
 _ALIASES: dict[str, tuple[str, ...]] = {
@@ -60,7 +64,8 @@ def due_snapshots(
 
     24h/72h/7d は「経過時間を超えていて、まだ取っていない」ものだけ。
     ただし empty_labels（行はあるが指標が空）は取り直す（_RETRY_GRACE / _BACKFILL_AFTER）。
-    latest は公開後 30 日までは毎回対象（rolling）。
+    latest は公開後 30 日までは毎回対象（rolling）。空のまま 30 日を過ぎた latest は
+    _LATEST_BACKFILL_UNTIL まで取り直す（30 日時点の期間指定で復元）。
     """
     now = now or datetime.now(JST)
     if post.published_at is None:
@@ -83,19 +88,28 @@ def due_snapshots(
         )
         if label not in have or retry_empty:
             due.append(label)
-    if age <= _LATEST_UNTIL:
+    if age <= _LATEST_UNTIL or ("latest" in empty and age <= _LATEST_BACKFILL_UNTIL):
         due.append("latest")
     return due
 
 
 def window_end(post: Post, label: str) -> datetime | None:
-    """label の時点（公開 + 窓）。窓を過ぎてから取り直す行を、期間指定で復元するのに使う。"""
-    if label not in _WINDOWS or post.published_at is None:
+    """label の時点（公開 + 窓）。窓を過ぎてから取り直す行を、期間指定で復元するのに使う。
+
+    latest は更新を止める 30 日時点を「その時点」とみなす。
+    """
+    if post.published_at is None:
+        return None
+    if label == "latest":
+        delta = _LATEST_UNTIL
+    elif label in _WINDOWS:
+        delta = _WINDOWS[label]
+    else:
         return None
     published = post.published_at
     if published.tzinfo is None:
         published = published.replace(tzinfo=JST)
-    return published + _WINDOWS[label]
+    return published + delta
 
 
 def needs_backfill(post: Post, label: str, now: datetime | None = None) -> bool:

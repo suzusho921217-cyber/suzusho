@@ -118,3 +118,21 @@ def test_collect_missing_metrics_stay_none():
 def test_collect_revenue_alias():
     s = collect_snapshot(_post(), "7d", {"estimatedRevenue": 123.45}, now=NOW)
     assert s.revenue_jpy == 123.45
+
+
+def test_due_retries_empty_latest_after_30d_until_backfill_limit():
+    # 2026-10-11〜14 の YouTube トークン失効中に 30 日目を迎えた投稿は、
+    # latest が空のまま固定されていた。空なら 30 日時点の値で復元する。
+    have = {"24h", "72h", "7d", "latest"}
+    assert due_snapshots(_post(published_offset_days=34), NOW,
+                         existing_labels=have, empty_labels={"latest"}) == ["latest"]
+    # 空でなければ 30 日以降は取らない
+    assert due_snapshots(_post(published_offset_days=34), NOW, existing_labels=have) == []
+    # 60 日を過ぎたらあきらめる
+    assert due_snapshots(_post(published_offset_days=61), NOW,
+                         existing_labels=have, empty_labels={"latest"}) == []
+
+
+def test_needs_backfill_latest_after_30d_grace():
+    assert not needs_backfill(_post(published_offset_days=30.5), "latest", NOW)
+    assert needs_backfill(_post(published_offset_days=34), "latest", NOW)
