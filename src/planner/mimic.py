@@ -19,7 +19,7 @@ import time
 from pathlib import Path
 
 from src.common.config import env
-from src.common.models import ContentPlan
+from src.common.models import ContentPlan, ExperimentFlag
 
 STATE_DIR = Path(__file__).resolve().parents[2] / ".state"
 USES_PER_CARD = 3
@@ -183,6 +183,10 @@ def apply(plans: list[ContentPlan], *, client=None, sleep=time.sleep) -> list[st
     taken: set[str] = set()  # 同じ日に同じ型を2ブランドで使わない（型の検証を分散）
     cfg = _mimic_cfg()
     for p in plans:
+        # 自社の勝ちタグを再演する exploit 枠は上書きしない（勝ちタグ不足の補填枠は真似てよい）
+        if p.experiment_flag == ExperimentFlag.EXPLOIT and p.notes.startswith("exploit: winning_tag"):
+            lines.append(f"{p.plan_id}: exploit 枠（自社の勝ちタグ）のため模倣しない")
+            continue
         picked = pick_card(cards, log, p.brand.value, taken,
                            pinned=cfg.get("pinned"), retired=cfg.get("retired"))
         if picked is None:

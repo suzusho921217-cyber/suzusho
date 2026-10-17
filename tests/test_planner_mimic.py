@@ -101,3 +101,15 @@ def test_pinned_and_retired_cards():
     assert mimic.pick_card(CARDS, {}, "dog", set(), retired=["BBB"])[0] == "AAA"  # 引退した型は使わない
     log = {"AAA|dog": ["p1"]}
     assert mimic.pick_card(CARDS, log, "dog", set(), pinned=["BBB"])[0] == "AAA"  # 途中の型は最後まで
+
+
+def test_exploit_winning_tag_plan_is_not_mimicked(tmp_path, monkeypatch):
+    monkeypatch.setattr(mimic, "STATE_DIR", tmp_path)
+    (tmp_path / "pattern_cards.json").write_text(json.dumps({"AAA": CARDS["AAA"]}))
+    p = _plan("2026-10-04-dog-01")
+    p.experiment_flag = ExperimentFlag.EXPLOIT
+    p.notes = "exploit: winning_tag score=0.900 (youtube)"
+    before = (p.concept_tag, p.prompt_text)
+    lines = mimic.apply([p], client=object())
+    assert (p.concept_tag, p.prompt_text) == before
+    assert "模倣しない" in lines[0]

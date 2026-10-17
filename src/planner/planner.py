@@ -104,9 +104,14 @@ def next_day_allocation(
         return DailyAllocation(total, "equal", allocs, warnings)
 
     # --- 実績モード ---
-    # explore を先に確保（最低本数 × ブランド数を下回らせない）
+    # explore を先に確保（最低本数 × ブランド数を下回らせない）。
+    # ただし総枠がそれ以下（2枠×2ブランド等）だと exploit が永久に 0 になるため、
+    # その時は exploit を1枠残す（2026-09-10 に 3→2 本へ減らしてから37日間 exploit 0 だった）。
+    explore_floor = n * min_explore
+    if total <= explore_floor:
+        explore_floor = max(0, total - 1)
     explore_total = total - round(total * exploit_ratio)
-    explore_total = max(explore_total, n * min_explore)
+    explore_total = max(explore_total, explore_floor)
     explore_total = min(explore_total, total)
     exploit_total = total - explore_total
 
@@ -123,11 +128,19 @@ def next_day_allocation(
     else:
         exploit = _largest_remainder(scores, exploit_total)
 
-    # explore: 最低本数 + 残りを均等
-    extra = explore_total - n * min_explore
-    explore = {b: min_explore for b in brands}
-    for b, add in _spread_evenly(brands, max(0, extra)).items():
-        explore[b] += add
+    if explore_total >= n * min_explore:
+        # explore: 最低本数 + 残りを均等
+        extra = explore_total - n * min_explore
+        explore = {b: min_explore for b in brands}
+        for b, add in _spread_evenly(brands, extra).items():
+            explore[b] += add
+    else:
+        # 全ブランドに最低本数を配れない時は、exploit の少ないブランドから配る
+        # （2枠なら「勝ちブランド=exploit 1・他方=explore 1」）
+        explore = {b: 0 for b in brands}
+        order = sorted(brands, key=lambda b: (exploit[b], scores[b], b))
+        for i in range(explore_total):
+            explore[order[i % n]] += 1
 
     _enforce_cap(brands, exploit, explore, brand_cap, scores, warnings)
 

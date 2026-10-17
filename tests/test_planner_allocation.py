@@ -92,3 +92,24 @@ def test_no_enabled_brands():
     alloc = next_day_allocation([], ALLOC_CFG, [])
     assert alloc.brands == []
     assert alloc.warnings
+
+
+def test_two_slots_two_brands_keeps_one_exploit():
+    # 2026-09-10〜10-17: 2枠×2ブランドで「各ブランド explore 最低1」が全枠を取り exploit 0 だった
+    wt = [{"brand": "cat", "score": 0.9}, {"brand": "dog", "score": 0.3}]
+    for ratio in (0.3, 0.5, 0.9):
+        cfg = {**ALLOC_CFG, "total_daily_slots": 2, "exploit_ratio": ratio}
+        alloc = next_day_allocation(wt, cfg, [Brand.CAT, Brand.DOG])
+        by = {b.brand: b for b in alloc.brands}
+        assert _sum(alloc) == 2
+        assert (by[Brand.CAT].exploit, by[Brand.CAT].explore) == (1, 0)  # 勝ちブランドが exploit
+        assert (by[Brand.DOG].exploit, by[Brand.DOG].explore) == (0, 1)
+        assert not alloc.warnings
+
+
+def test_three_slots_keeps_min_explore_per_brand():
+    wt = [{"brand": "cat", "score": 0.9}, {"brand": "dog", "score": 0.3}]
+    cfg = {**ALLOC_CFG, "total_daily_slots": 3}
+    alloc = next_day_allocation(wt, cfg, [Brand.CAT, Brand.DOG])
+    assert sum(b.exploit for b in alloc.brands) == 1
+    assert all(b.explore >= 1 for b in alloc.brands)
