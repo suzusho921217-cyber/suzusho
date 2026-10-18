@@ -113,3 +113,33 @@ def test_exploit_winning_tag_plan_is_not_mimicked(tmp_path, monkeypatch):
     lines = mimic.apply([p], client=object())
     assert (p.concept_tag, p.prompt_text) == before
     assert "模倣しない" in lines[0]
+
+
+def test_card_failing_twice_is_skipped_for_that_brand(tmp_path, monkeypatch):
+    # 失敗を数えないと、途中の型（人が主役で通らない）を毎日選び続けていた
+    monkeypatch.setattr(mimic, "STATE_DIR", tmp_path)
+    (tmp_path / "pattern_cards.json").write_text(json.dumps({"AAA": CARDS["AAA"], "BBB": CARDS["BBB"]}))
+    (tmp_path / "mimic_log.json").write_text(json.dumps({"AAA|dog": ["p0"]}))  # AAA が途中
+    picked = []
+
+    def gen(*, model, contents, config):
+        picked.append("ミニカート" in contents)  # AAA のカードか
+        text = "男性が顔を出す" if picked[-1] else "0秒〜子犬が走る"
+        return SimpleNamespace(text=json.dumps({"title": "t", "hook": "h", "veo_prompt": text},
+                                               ensure_ascii=False))
+
+    client = SimpleNamespace(models=SimpleNamespace(generate_content=gen))
+    for i in range(2):
+        line = mimic.apply([_plan(f"d{i}")], client=client)[0]
+        assert f"失敗 {i + 1}/2" in line
+    assert json.loads((tmp_path / "mimic_failures.json").read_text()) == {"AAA|dog": 2}
+    p = _plan("d2")
+    mimic.apply([p], client=client)
+    assert p.concept_tag == "模倣" and "u2" in p.notes      # 3日目は次の型（BBB）へ
+    assert mimic.pick_card(CARDS, {}, "cat", set(), failures={"AAA|dog": 2, "BBB|dog": 2})[0] == "BBB"  # 他ブランドは別
+
+
+def test_own_character_words_are_not_violations():
+    own = "主役は「ブリティッシュショートヘアの子猫」。驚くと目を見開いて固まる。"
+    assert mimic.violations(own + " 0秒〜子猫が箱をのぞく", own=own) == []
+    assert mimic.violations(own + " 女性が目を見開く", own=own)  # 人が出たら従来どおり NG

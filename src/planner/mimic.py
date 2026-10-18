@@ -23,6 +23,9 @@ from src.common.models import ContentPlan, ExperimentFlag
 
 STATE_DIR = Path(__file__).resolve().parents[2] / ".state"
 USES_PER_CARD = 3
+# 台本が禁止事項を守れなかった回数がこれに達した型は、そのブランドでは使わない。
+# 失敗を数えないと「途中の型を優先」で人が主役の型に毎日はまり込む（2026-10-11〜18 に連続失敗）。
+MAX_FAILS = 2
 
 _PROMPT = """\
 あなたはショート動画の構成作家です。下の「元ネタ」は登録者の数千倍再生された競合ショートを
@@ -69,16 +72,19 @@ def _mimic_cfg() -> dict:
 
 
 def pick_card(cards: dict, log: dict, brand: str, taken: set[str],
-              *, pinned: list[str] | None = None, retired: list[str] | None = None) -> tuple[str, dict] | None:
+              *, pinned: list[str] | None = None, retired: list[str] | None = None,
+              failures: dict | None = None) -> tuple[str, dict] | None:
     """ブランドごとに、途中の型を優先して3本まで。次に会議が指名した型（pinned）、次に登録者比の高い型。
 
-    retired（会議が「もう真似ない」とした型）は使わない。
+    retired（会議が「もう真似ない」とした型）と、台本が MAX_FAILS 回失敗した型は使わない。
     """
     pinned = list(pinned or [])
     retired = set(retired or [])
+    failures = failures or {}
     usable = [(vid, c) for vid, c in cards.items()
               if c.get("mimicable") and vid not in taken and vid not in retired
-              and len(log.get(f"{vid}|{brand}", [])) < USES_PER_CARD]
+              and len(log.get(f"{vid}|{brand}", [])) < USES_PER_CARD
+              and failures.get(f"{vid}|{brand}", 0) < MAX_FAILS]
     if not usable:
         return None
 
@@ -107,9 +113,11 @@ _HUMAN_WORDS = ("女性", "男性", "女の子", "男の子", "子ども", "子�
 _CUT_WORDS = ("シーンが切り替", "場面が切り替", "場面転換", "カットが変わ", "別のシーン")
 
 
-def violations(text: str) -> list[str]:
+def violations(text: str, *, own: str = "") -> list[str]:
+    """own（うちの主役の説明文。台本の冒頭にそのまま入る）に元からある語は数えない。
+    例: ブリティッシュショートヘアの「驚くと目を見開いて固まる」で毎回落ちていた。"""
     out = []
-    hits = [w for w in _HUMAN_WORDS if w in text]
+    hits = [w for w in _HUMAN_WORDS if w in text and w not in own]
     if hits:
         out.append(f"人間が映っている（{'・'.join(hits)}）。人は手・足元・画面外の声だけにする")
     if any(w in text for w in _CUT_WORDS):
@@ -128,11 +136,11 @@ def _write_script(client, character: str, card: dict, *, sleep=time.sleep) -> di
     script = _call(client, prompt, sleep=sleep)
     if script is None:
         return None
-    problems = violations(script["veo_prompt"])
+    problems = violations(script["veo_prompt"], own=character)
     if problems:
         retry = prompt + "\n\n## 前回の台本の問題（必ず直す）\n" + "\n".join(f"- {x}" for x in problems)
         script = _call(client, retry, sleep=sleep)
-        if script is None or violations(script["veo_prompt"]):
+        if script is None or violations(script["veo_prompt"], own=character):
             return None
     return script
 
@@ -179,6 +187,8 @@ def apply(plans: list[ContentPlan], *, client=None, sleep=time.sleep) -> list[st
 
     log_path = STATE_DIR / "mimic_log.json"
     log = _read(log_path, {})
+    fail_path = STATE_DIR / "mimic_failures.json"
+    failures = _read(fail_path, {})
     lines: list[str] = []
     taken: set[str] = set()  # 同じ日に同じ型を2ブランドで使わない（型の検証を分散）
     cfg = _mimic_cfg()
@@ -188,7 +198,7 @@ def apply(plans: list[ContentPlan], *, client=None, sleep=time.sleep) -> list[st
             lines.append(f"{p.plan_id}: exploit 枠（自社の勝ちタグ）のため模倣しない")
             continue
         picked = pick_card(cards, log, p.brand.value, taken,
-                           pinned=cfg.get("pinned"), retired=cfg.get("retired"))
+                           pinned=cfg.get("pinned"), retired=cfg.get("retired"), failures=failures)
         if picked is None:
             lines.append(f"{p.plan_id}: 使える型が残っていないため通常企画のまま")
             continue
@@ -200,7 +210,11 @@ def apply(plans: list[ContentPlan], *, client=None, sleep=time.sleep) -> list[st
             lines.append(f"{p.plan_id}: 台本作成に失敗（通常企画のまま）: {type(e).__name__}: {str(e)[:100]}")
             continue
         if not script:
-            lines.append(f"{p.plan_id}: 台本が読めない／禁止事項を守れなかったため通常企画のまま")
+            # 混雑(504等)は型のせいではないので数えない。ここ（読めない・禁止事項）だけ数える
+            key = f"{vid}|{p.brand.value}"
+            failures[key] = failures.get(key, 0) + 1
+            lines.append(f"{p.plan_id}: 台本が読めない／禁止事項を守れなかったため通常企画のまま"
+                         f"（型 {vid} 失敗 {failures[key]}/{MAX_FAILS}）")
             continue
         n = len(log.get(f"{vid}|{p.brand.value}", [])) + 1
         src = f"{card.get('url')}（{card.get('ratio')}倍・{card.get('channel')}）"
@@ -213,4 +227,5 @@ def apply(plans: list[ContentPlan], *, client=None, sleep=time.sleep) -> list[st
         lines.append(f"{p.plan_id}: {p.notes}")
     log_path.parent.mkdir(parents=True, exist_ok=True)
     log_path.write_text(json.dumps(log, ensure_ascii=False, indent=1), encoding="utf-8")
+    fail_path.write_text(json.dumps(failures, ensure_ascii=False, indent=1), encoding="utf-8")
     return lines
