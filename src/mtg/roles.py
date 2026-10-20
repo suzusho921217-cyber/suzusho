@@ -434,12 +434,25 @@ OWNER_MINDSET = """\
 
 """
 
+# 2026-10-20 ユーザー指示。統括が「試し生成→判定→記録まで投稿禁止」「クレジット追加(B)」を
+# 5日続けて出し、実行手段の無い前提条件で模倣型の投稿が先送りされ続けたための歯止め。
+NO_EXTRA_SPEND = """\
+★★お金と試し生成のルール（2026-10-20 ユーザー指示・最優先）★★
+- 追加のお金はかけない。Veo の前払い残を使い切ったら止める（2026-10-18 決定）。クレジット追加・
+  予算増額・生成本数の増加は needs_user_approval に出さない（出しても却下される）。
+- 「試し生成」を通常枠と別に作らない（前払いを削って止まる日が早まるだけ）。模倣型の検証は
+  毎日の通常枠そのもので行う。規約チェックは台本段階のポリシー判定（policy.check_prompt）と
+  模倣台本の禁止事項（人の顔・子ども・痛がる/危険な描写・刃物なし）で済んでいるものとして扱う。
+- 「〜を decision_log に記載するまで投稿しない」「試し生成の判定が出るまで投稿禁止」のような、
+  会議に実行手段の無い前提条件を決定に付けない。基準値は決めた値をそのまま decision_log に書けば足りる。
+"""
+
 ANALYST_SYSTEM = OWNER_MINDSET + MIMIC_POLICY + "\n" + ANALYST_SYSTEM
 RESEARCHER_SYSTEM = OWNER_MINDSET + RESEARCHER_SYSTEM
 MARKETER_SYSTEM = OWNER_MINDSET + MIMIC_POLICY + "\n" + MARKETER_SYSTEM
 CRITIC_SYSTEM = OWNER_MINDSET + MIMIC_POLICY + "\n" + CRITIC_SYSTEM
-COORDINATOR_SYSTEM = OWNER_MINDSET + MIMIC_POLICY + "\n" + COORDINATOR_SYSTEM
-STRATEGIST_SYSTEM = OWNER_MINDSET + STRATEGIST_SYSTEM
+COORDINATOR_SYSTEM = OWNER_MINDSET + NO_EXTRA_SPEND + MIMIC_POLICY + "\n" + COORDINATOR_SYSTEM
+STRATEGIST_SYSTEM = OWNER_MINDSET + NO_EXTRA_SPEND + STRATEGIST_SYSTEM
 
 
 # 統括の最終確認（出力の直前に効かせるため末尾に置く）。2026-09-19: 「9/22まで現状維持」の再発対策
@@ -451,6 +464,8 @@ COORDINATOR_SYSTEM += """
   （add_research_query / add_watch_channel / pin_pattern_card / retire_pattern_card）にする。
 - needs_user_approval やheadlineに、打ち手の無い悲観（「厳しい」「遠い」だけ）を書かない。
 - 「confidence」が低い/データ不足でも、上の2点は変わらない。
+- needs_user_approval にクレジット追加・予算増額・本数増加・試し生成を入れない（2026-10-20 ユーザー指示。
+  上の「生成本数を増やす提案」「費用が増える打ち手は提案する」より優先）。
 - 資料の「config/scoring.yaml」「事実の訂正」に書かれた数値・事実が、過去ログの記述と食い違う場合は
   資料側を採用する。
 """
