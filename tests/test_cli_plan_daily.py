@@ -3,9 +3,8 @@
 import json
 
 from src.cli import main
-from src.common.config import load
 
-_SLOTS = load("scoring")["allocation"]["total_daily_slots"]
+_SLOTS = 2  # tests/conftest.py の TEST_DAILY_SLOTS（実 config と切り離して固定）
 
 
 def test_plan_daily_bootstrap_writes_file(tmp_path, capsys):

@@ -9,9 +9,8 @@ import pytest
 
 import src.cli as cli_module
 from src.cli import main
-from src.common.config import load
 
-_SLOTS = load("scoring")["allocation"]["total_daily_slots"]
+_SLOTS = 2  # tests/conftest.py の TEST_DAILY_SLOTS（実 config と切り離して固定）
 from src.common.models import Brand, Platform, PolicyDecision, Post, PostStatus
 from src.publishers.base import Publisher, PublishResult
 from src.sheets.client import LocalStore

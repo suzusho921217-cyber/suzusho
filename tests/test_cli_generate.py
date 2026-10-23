@@ -6,10 +6,9 @@ from datetime import datetime, timedelta, timezone
 import pytest
 
 from src.cli import main
-from src.common.config import load
 
 _JST = timezone(timedelta(hours=9))
-_SLOTS = load("scoring")["allocation"]["total_daily_slots"]  # 実 config の1日本数
+_SLOTS = 2  # tests/conftest.py の TEST_DAILY_SLOTS（実 config と切り離して固定）
 
 
 @pytest.fixture

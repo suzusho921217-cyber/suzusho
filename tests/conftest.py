@@ -44,6 +44,29 @@ def _isolate_from_local_env(monkeypatch):
         monkeypatch.delenv(key, raising=False)
 
 
+# テストが前提にする1日の本数。本番の total_daily_slots は会議ボット(agent-mtg)が
+# 自動で減らすことがあり（2026-10-20 に 2→1）、実 config を読むとテストが巻き込まれて落ちる。
+TEST_DAILY_SLOTS = 2
+
+
+@pytest.fixture(autouse=True)
+def _pin_daily_slots(tmp_path_factory, monkeypatch):
+    """実 config の写しで total_daily_slots だけ TEST_DAILY_SLOTS に固定して読ませる。"""
+    import shutil
+
+    import yaml
+
+    d = tmp_path_factory.mktemp("config")
+    shutil.copytree(_config.CONFIG_DIR, d, dirs_exist_ok=True)
+    scoring = yaml.safe_load((d / "scoring.yaml").read_text(encoding="utf-8"))
+    scoring["allocation"]["total_daily_slots"] = TEST_DAILY_SLOTS
+    (d / "scoring.yaml").write_text(yaml.safe_dump(scoring, allow_unicode=True), encoding="utf-8")
+    monkeypatch.setattr(_config, "CONFIG_DIR", d)
+    _config.load.cache_clear()  # load は @cache。固定前/他テストの読み込み結果を捨てる
+    yield
+    _config.load.cache_clear()
+
+
 @pytest.fixture(autouse=True)
 def _no_sheets_write_pacing(monkeypatch):
     """本番の Sheets 書き込み間隔（1分60回の上限対策）はテストでは待たない。"""

@@ -8,6 +8,7 @@ import shutil
 import pytest
 from ruamel.yaml import YAML
 
+from src.common import config as _config
 from src.mtg import apply as apply_module
 from src.mtg.apply import (
     ApplyError,
@@ -22,8 +23,6 @@ from src.mtg.apply import (
     apply_set_level_range,
 )
 
-_REAL_CONFIG_DIR = apply_module.CONFIG_DIR
-
 
 @pytest.fixture
 def config_dir(tmp_path, monkeypatch):
@@ -31,7 +30,7 @@ def config_dir(tmp_path, monkeypatch):
     d.mkdir()
     for name in ("planning.yaml", "hashtags.yaml", "scoring.yaml", "budget.yaml",
                  "generation.yaml"):
-        shutil.copy(_REAL_CONFIG_DIR / name, d / name)
+        shutil.copy(_config.CONFIG_DIR / name, d / name)  # conftest で本数固定済みの写し
     monkeypatch.setattr(apply_module, "CONFIG_DIR", d)
     return d
 
